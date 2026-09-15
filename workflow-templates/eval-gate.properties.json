@@ -1,0 +1,6 @@
+{
+  "name": "Eval gate (smoke)",
+  "description": "Runs the smoke eval subset under the eval-gate environment (human approval required).",
+  "iconName": "shield",
+  "categories": ["Python", "CI", "testing"]
+}

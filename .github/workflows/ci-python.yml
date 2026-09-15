@@ -1,0 +1,32 @@
+# Callable Python CI — referenced from other repos as:
+#   uses: CloudCrane-Software/.github/.github/workflows/ci-python.yml@main
+name: CI (Python)
+on:
+  workflow_call:
+    inputs:
+      mypy-targets:
+        description: "Space-separated mypy targets (default: repo root pyproject config)"
+        required: false
+        type: string
+        default: "."
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Lint (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Type check (mypy)
+        run: uv run mypy ${{ inputs.mypy-targets }}
+      - name: Test (pytest)
+        run: uv run pytest -v

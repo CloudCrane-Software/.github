@@ -1,0 +1,24 @@
+# Callable eval gate — referenced from other repos as:
+#   uses: CloudCrane-Software/.github/.github/workflows/eval-gate.yml@main
+# The `environment: eval-gate` binding makes the job wait for a human reviewer
+# approval (required reviewer configured per repo). Threshold files must never
+# be modified in the same PR as product code — enforced by guard.yml in each repo.
+name: Eval gate (smoke)
+on:
+  workflow_call:
+
+jobs:
+  eval-smoke:
+    runs-on: ubuntu-latest
+    environment: eval-gate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run smoke evals
+        run: uv run pytest -m smoke -v
