@@ -1,0 +1,6 @@
+{
+  "name": "Python CI (uv + ruff + mypy + pytest)",
+  "description": "Standard CI for all Python repos: uv sync, ruff check/format, mypy, pytest on Python 3.12.",
+  "iconName": "python",
+  "categories": ["Python", "CI", "continuous-integration"]
+}

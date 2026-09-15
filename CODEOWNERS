@@ -1,0 +1,4 @@
+# CODEOWNERS template. In this org the sole owner is @feasy898.
+# Instantiate per repo; keep eval asset paths owned by the human only.
+# NOTE for private CNB repos (eval-gate): /thresholds/ and /golden/ are human-owned.
+* @feasy898

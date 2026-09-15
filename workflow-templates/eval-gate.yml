@@ -1,0 +1,33 @@
+# Reusable eval gate — canonical template (starter workflow).
+# Runs the smoke subset of the eval suite under the `eval-gate` environment,
+# which requires a human reviewer approval before the job executes.
+# Callable copy for cross-repo `uses:` lives at
+# CloudCrane-Software/.github/.github/workflows/eval-gate.yml
+name: Eval gate (smoke)
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  eval-smoke:
+    runs-on: ubuntu-latest
+    environment: eval-gate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run smoke evals
+        run: uv run pytest -m smoke -v
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: evals/**/report.json
+          if-no-files-found: ignore
