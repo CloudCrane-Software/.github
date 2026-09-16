@@ -1,5 +1,8 @@
 # ADR 0001: required approvals in a single-account organization
 
+> **SUPERSEDED by ADR 0003 (2026-09-16)** — the merge-gate mechanism described
+> below was removed by owner decision; auto-merge is now the principle.
+
 ## Context
 Manual §3.2 requires `required_approving_review_count=1` (the human approves
 every PR). GitHub structurally forbids PR authors from approving their own
