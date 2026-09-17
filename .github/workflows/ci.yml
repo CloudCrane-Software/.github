@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint workflows & YAML sanity (dotgithub)
+        run: |
+          set -euo pipefail
+          # actionlint for any workflows, python yaml parse for the rest
+          curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash
+          ./actionlint -shellcheck= || true
+          python3 - <<'PY'
+          import sys, yaml, pathlib
+          bad = []
+          for p in pathlib.Path(".").rglob("*.y*ml"):
+              if ".git/" in str(p): continue
+              try: yaml.safe_load(p.read_text())
+              except Exception as e: bad.append(f"{p}: {e}")
+          if bad: print("\n".join(bad)); sys.exit(1)
+          print("yaml ok:", sum(1 for _ in pathlib.Path(".").rglob("*.y*ml")), "files")
+          PY
+          # no secrets
+          ! grep -rInE "(ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,})" --include='*.yml' --include='*.yaml' --include='*.md' . || { echo "secret-like string"; exit 1; }
