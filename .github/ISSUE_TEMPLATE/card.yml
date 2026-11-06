@@ -184,3 +184,40 @@ body:
       render: bash
     validations:
       required: false
+
+  # ---- v1.1 可选字段（manifest schema v1.1 同名三键；只增不改，全部可选）------
+  # 出处：沙箱研究 D-1（repo/env_precondition，§3.2 M-5/M-6）＋ CI L-08
+  # （fast_tests：acceptance 派生测试登记，只增不改）＋ Q5 盲点 B6（bench 卡
+  # repo 无字段承载活案例）。与 manifest 侧 af.wave-manifest.v1 十字段必填性
+  # 零触碰；校验口径见 factory-os/.github/workflows/planner.yml step 08
+  # 「有值才校验」三规则：repo 存活性 GET /repos/{repo} 200；fast_tests 元素
+  # basename 形制（禁塞命令串）；env_precondition 非空串。
+  - type: input
+    id: repo
+    attributes:
+      label: repo（可空）
+      description: 本卡指向的外部仓（owner/name 形制）。有值时 planner step 08 做存活性校验（GET /repos/{repo} 须 200）；bench 卡用它承载活案例（Q5 盲点 B6）。留空 = 不指向外部仓。
+      placeholder: CloudCrane-Software/factory-os
+    validations:
+      required: false
+
+  - type: input
+    id: env_precondition
+    attributes:
+      label: env_precondition（可空）
+      description: 环境前置声明（非空串）：GPU/CUDA、依赖版本、代理剥离（env -u HTTP_PROXY … LC_CTYPE=C.UTF-8）等。语义与命令族一致性校验留 #13 干跑/沙箱自检；manifest 侧只校非空（D-1 §3.2 M-5/M-6）。
+      placeholder: cargo 必须剥离代理环境变量（env -u HTTP_PROXY … LC_CTYPE=C.UTF-8）
+    validations:
+      required: false
+
+  - type: textarea
+    id: fast_tests
+    attributes:
+      label: fast_tests（可空）
+      description: 一行一个 basename 测试件清单（禁命令串、禁路径分隔符）；落点纪律照 CI L-08：factory-os tools/test-*.py 或 af 封闭快速子集——planner 波次 acceptance 的派生测试登记。
+      placeholder: |
+        test-quota-gate-criteria-parity.py
+        test-e161-supply-liveness.py
+      render: bash
+    validations:
+      required: false
