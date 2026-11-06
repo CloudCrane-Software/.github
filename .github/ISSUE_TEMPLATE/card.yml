@@ -7,12 +7,17 @@
 #   task_id / 债号 / 证据（内嵌）/ 验收命令集 / pinned base / 允许路径 /
 #   禁项（置顶）/ 内存预算 / 通道 —— 九项齐了才派得出去。
 #
-# label 纪律：新建卡自动落 wave/queued（状态机正本见 docs/labels.md）。
+# label 纪律：新建卡自动落 state:queued（状态机正本见 docs/labels.md；2026-11-07
+# 夜轨C3 对齐——旧 wave/queued 七态已废弃 D-79 批，表单卡改落正本态，派发器/
+# 规划环按 state:queued 扫板）。
+# 机读行块（af-card/1.0）：表单卡内置机器可读行块——首行机器标记+结构化体
+# （fos#26 判读器同风格；directive.yml 入口卡同批同款）。机器派发面只读 issue
+# body 里本块；评论补行不进机读面（夜轨C2 断点2b 实证），补行须 PATCH body。
 # =============================================================================
 name: 施工卡（af 黑灯工厂）
 description: 波次自转开发制度 v1 的派工单——卡面自包含，九项字段齐备才进板
 labels:
-  - wave/queued
+  - state:queued
 body:
   # ---- 禁项（置顶）----------------------------------------------------------
   - type: markdown
@@ -44,8 +49,36 @@ body:
     id: debt
     attributes:
       label: 债号（debt）
-      description: 本卡清偿的逃逸问题台账债号（如 RT-E230）。占用闸按债号判重；无债号 = 换锚或先登记债行（禁 --force）。
+      description: 本卡清偿的逃逸问题台账债号（如 RT-E230）。占用闸按债号判重；无债号 = 换锚或先登记债行（禁 --force）。须与下方「机读行块」的 debt= 行一致（机器只认机读行块）。
       placeholder: RT-E230
+    validations:
+      required: true
+
+  # ---- 2b. 机读行块（af-card/1.0）——机器派发面唯一认读位 ----------------------
+  - type: markdown
+    attributes:
+      value: |
+        ## 机读行块（af-card/1.0——机器派发面只认本块）
+
+        派发器/规划环消费端只读 issue body 里 `af-card/1.0` 起头的机读行块
+        （首行机器标记+结构化体，fos#26 判读器同风格）；人读分节（上面各栏）
+        不进机读面。四行整块照抄后改值，`key=value` 逐行填；`debt=` 必须与
+        上面「债号」栏一致。缺块 = 第三形态缺机读，派发器禁派（夜轨C2 断点2
+        实证）；评论补行不算（断点2b）——漏填须 PATCH 卡面 body 补块。
+  - type: textarea
+    id: machine_lines
+    attributes:
+      label: 机读行块（af-card/1.0——整块照抄后改值）
+      description: |
+        四行整块照抄，仅改值：debt=债号（与上方「债号」栏一致）；
+        task_id=任务标识（与上方 task_id 栏一致）；depends_on=依赖（无则写「无」）。
+        值内禁换行；其余键（如 ledger=、allowed_paths=）可选追加，机器容忍忽略。
+      placeholder: |
+        af-card/1.0
+        debt=RT-E230
+        task_id=otel-e2e-final-fix
+        depends_on=无
+      render: bash
     validations:
       required: true
 

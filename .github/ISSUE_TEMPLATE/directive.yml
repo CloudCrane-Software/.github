@@ -1,0 +1,206 @@
+# =============================================================================
+# directive.yml — 开发指令入口卡（org 治理面：.github 仓 · 夜轨C3-20261107 落库）
+#
+# 定位（断点1闭合件；范式文=30-工件/夜轨C-20261106/planner链补件-20261107 §一）：
+#   运营者手里的大段开发指令此前**无结构化入口**——板上唯一模板=施工卡
+#   card.yml（单卡派工粒度）。本模板补入口层：
+#
+#   大段指令 → 【directive 入口卡】→ 拆解（登记台账债行）→ planner 逐波消费
+#
+# 九块形（本 ask 钉定）：指令原文 / 来源 / 拆解建议 / 债号预算 / 依赖声明 /
+#   禁项 / 验收口径 / 时效 / 处置记录。
+#
+# 机读行块（af-card/1.0；断点2闭合件之一）：
+#   卡面内置机器可读行块——首行机器标记 + 结构化 key=value 体，与 fos#26 判读器
+#   「首行机器标记＋结构化体」约定同风格（四形态先例：Q1 四前缀 / Q2 af-relay /
+#   Q2 af-perm-request / Q6 TICKET-REQUEST）。契约：
+#     - 块首行内容恰为 `af-card/1.0`，其后连续 `key=value` 行；
+#     - 机器（派发器/规划环消费端）只读 issue **body** 里的本块——评论补行不进
+#       机读面（夜轨C2 断点2b 实证），补行必须 PATCH body；
+#     - 人读分节与本块不一致时以本块为准（机器认块）。
+#   card.yml（施工卡）同批内置同款块——两模板共用同一契约，勿两处自定义。
+#
+# label 纪律：预挂 `directive`（叠加位，不占状态格——docs/labels.md「新增 label
+#   族定义」）。禁预挂 state:*（指令卡不是施工卡，不进状态机）。
+# =============================================================================
+name: 开发指令（directive 入口卡）
+description: 大段开发指令的结构化入口——一段指令进板，拆多波施工；不是派工单
+labels:
+  - directive
+body:
+  # ---- 先读再填（非字段）------------------------------------------------------
+  - type: markdown
+    attributes:
+      value: |
+        ## ⛔ 先读再填（指令卡 ≠ 施工卡）
+
+        1. **本卡不直接派工**：指令卡是「指令入板 + 拆解登记」的载体；施工粒度由
+           拆解后的**施工卡**（card.yml）承载，或由 planner 规划环逐波建卡。
+        2. **指令正文禁含任何凭据形态**（sk-… / ghp_… / github_pat_… / 私钥块 /
+           JWT / 内网地址）：issue 建在公开仓，全网可读；推送/张贴前自过
+           bot-scrub 同款纪律。
+        3. **拆解必须落台账**：每条拆解项对应一个**债号锚**；台账（factory-os
+           `账本/阶段欠账台账.md`）无行的债号，planner 占用闸 fail-closed 拒收
+           （M-6）——先登记债行，再谈派工。
+        4. **判官/门/判据件一改即拒收**：任何拆解项不得把判官路径写进
+           allowed_paths（rt-e82/83 双案；factory-os `docs/judge-paths.md`）。
+        5. **机读行块必须填**（末栏）：机器派发面只认 `af-card/1.0` 机读行块——
+           缺块的表单卡=第三形态缺机读，派发器禁派（夜轨C2 断点2 实证）；评论
+           补行不算（断点2b），补行须 PATCH 卡面 body。
+
+  # ---- 1. 指令原文 -------------------------------------------------------------
+  - type: textarea
+    id: directive_text
+    attributes:
+      label: 1. 指令原文
+      description: |
+        运营者开发指令**逐字原样**贴入——本卡是指令的**板上人读正本**（拆解不得
+        改写指令本身：只能拆，不能改）。禁凭据形态；其余不改一字。
+      placeholder: |
+        （运营者原话/指令全文，逐字贴入）
+      render: markdown
+    validations:
+      required: true
+
+  # ---- 2. 来源 ------------------------------------------------------------------
+  - type: dropdown
+    id: source
+    attributes:
+      label: 2. 来源
+      description: 指令从哪来（溯源与演练/真需求区分——演练合成指令必须在处置记录标注，禁混入真需求账）。
+      options:
+        - 运营者原话逐字转贴
+        - 值班/晨会指令单
+        - 明早清单/裁决清单衍生
+        - 自编排演练合成指令（非真需求，须在处置记录标注）
+        - 其他（指令原文内点名）
+    validations:
+      required: true
+
+  # ---- 3. 拆解建议 ---------------------------------------------------------------
+  - type: textarea
+    id: decomposition
+    attributes:
+      label: 3. 拆解建议（每行一个债号锚：债号 ｜ 一句话要做的事 ｜ 台账行状态）
+      description: |
+        指令 → 债号锚的拆解登记面。纪律：
+        - 债号从台账现役最高号顺延；撞号自查 = 本地 grep ＋ 两板 open issues
+          `D-\d+` API 全量实拉对账（只 grep 本地会撞板上批外卡，D-80/D-104 先例）；
+        - 台账无行的债号标 `[未登记]`——登记债行完成前该行**禁派工**（M-6）；
+        - 拆不动/拿不准的行如实写 `[待拆]`，禁硬拆禁假登记。
+      placeholder: |
+        D-105 ｜ obs-deadcode-scan-gate 接入 allgates ｜ 台账已登记
+        D-106 ｜ ledger-growth-gate 接入 allgates ｜ [未登记]
+        D-107 ｜ 沙箱环 bench 判分面 ｜ [待拆]
+      render: bash
+    validations:
+      required: true
+
+  # ---- 4. 债号预算 ---------------------------------------------------------------
+  - type: input
+    id: debt_budget
+    attributes:
+      label: 4. 债号预算
+      description: |
+        本卡占用的债号锚预算：入口卡自身锚（directive_card）＋拆解子锚清单
+        （逗号分隔，与第 3 栏逐行对应）。全部须台账在册；无行的锚禁填。
+        撞号自查两板对账通过后才可提交。
+      placeholder: D-115（本卡）＋ D-116（子锚）
+    validations:
+      required: true
+
+  # ---- 5. 依赖声明 ----------------------------------------------------------------
+  - type: textarea
+    id: depends_on_decl
+    attributes:
+      label: 5. 依赖声明（可空；一行一条）
+      description: |
+        本指令的前置依赖（无则写「无」）。口径（夜轨C2 断点3 裁决建议）：依赖
+        「解」= 依赖对象 state:merged 或台账 ✅；directive 入口卡**不作可解依赖
+        对象**——跨卡依赖写台账锚号，不写入口卡卡号。
+      placeholder: |
+        无
+      render: bash
+    validations:
+      required: false
+
+  # ---- 6. 禁项 ---------------------------------------------------------------------
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 6. 禁项
+      description: |
+        本指令特有的边界禁项：不许动什么、不许假设什么。拆解时逐条进对应施工卡
+        卡面；通用禁项（判官面/force/secret/占用闸 --force）模板已置顶，无需重复。
+      placeholder: |
+        - 禁改 tools/all-gates.sh 判定面（只许在门注册表里加行）
+        - 假设 anolis 在线（失联则该波改派 local-api）
+      render: bash
+    validations:
+      required: true
+
+  # ---- 7. 验收口径 -------------------------------------------------------------------
+  - type: textarea
+    id: acceptance_overall
+    attributes:
+      label: 7. 验收口径（总口径；命令→期望 rc=N）
+      description: |
+        这段指令做完的判定标准：交付什么件、跑什么命令、什么读数算完。拆解后
+        逐波逐卡的 acceptance 必须能对回这里（对不回 = 拆解错了）。
+      placeholder: |
+        python3 -I tools/sunset-audit.py --selftest   # exit 0
+        python3 -c "import py_compile; py_compile.compile('tools/x.py', doraise=True)"   # exit 0
+      render: bash
+    validations:
+      required: true
+
+  # ---- 8. 时效 ------------------------------------------------------------------------
+  - type: input
+    id: validity
+    attributes:
+      label: 8. 时效
+      description: 本指令有效窗（如 `72h`、`明早派工窗`）。过期未处置按作废/重登处理，处置记录留痕；无时效的长期项写「长期有效」并说明。
+      placeholder: 72h
+    validations:
+      required: true
+
+  # ---- 9. 处置记录 ----------------------------------------------------------------------
+  - type: textarea
+    id: disposal_log
+    attributes:
+      label: 9. 处置记录（append-only；可空）
+      description: |
+        本卡处置留痕面，追加不删改：开卡 = 待处置；后续每步处置（拆解登记完成 /
+        label 补挂 / 拆解件开卡号 / 派工 / 作废 / 改派）逐条追加一行带时刻与依据。
+      placeholder: |
+        2026-11-07 04:5x 待处置（开卡；自编排演练合成指令，今晚不派施工）
+      render: bash
+    validations:
+      required: false
+
+  # ---- 机读行块（af-card/1.0）——机器派发面唯一认读位 -----------------------------------------
+  - type: markdown
+    attributes:
+      value: |
+        ## 机读行块（af-card/1.0）
+
+        机器派发面（派发器/规划环消费端）**只读下面这块**；人读分节不进机读。
+        逐行照实填（`key=value`，值内禁换行）；`debt=` 必须与第 4 栏债号预算一致。
+  - type: textarea
+    id: machine_lines
+    attributes:
+      label: 机读行块（af-card/1.0——整块照抄后改值）
+      description: |
+        首行机器标记 + 结构化体（fos#26 判读器同风格）。四行整块照抄，仅改值：
+        directive_card=本入口卡自身锚；debt=同 directive_card（台账在册）；
+        decomposition=第 3 栏子锚列表（逗号分隔）；depends_on=无或台账锚。
+        缺块=派发器禁派；评论补行不算（须 PATCH 卡面）。
+      placeholder: |
+        af-card/1.0
+        directive_card=D-115
+        debt=D-115
+        decomposition=D-116
+        depends_on=无
+      render: bash
+    validations:
+      required: true
