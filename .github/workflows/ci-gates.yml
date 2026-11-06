@@ -47,6 +47,24 @@
 #   · workflow_dispatch: org 仓自试跑面（夹具判别力活跑；验收命令集 2 dispatch 回读
 #     job 日志）。触发面纪律：禁提权触发（R03 口径）、权限只读（R05）。
 #
+# 第三批双件（inputs 点选；.github#17 / D-90 / CI L-02；A-2 与 A-6 必须同批）:
+#   roster-check    A-2 名册四面对账——名册在库（在列件逐件工作树实位，删一件即红）
+#                   ＋自声明段核（#<键>=<n> 声明行必在/可解析/不重复）＋件数下限对账
+#                   （在列≡声明；人口≥下限；人口=在列数或 counted_cmd 读数，读不到
+#                   死手红）＋变更留痕 diff 面（名册现 sha256 须登记在留痕面，登记串
+#                   "<basename> sha256=<hex>"；RT-E84④ 口径）。--require-git 版本面
+#                   前提 fail-closed（卡面禁项：禁在无 git 版本面的仓启用 A-2）。
+#                   正本形态: factory-os tools/test-manifest.list × all-gates.sh
+#                   register_L2 对账段（机制移植、名册/键名/下限/留痕面全由调用仓供）。
+#   mutation-drill  A-6 变异演练——对名册列名件做删-验-还探针：基线绿→删件⇒A-2 必红
+#                   并点名「在库缺席」→字节级复原⇒必绿（删件腿 rc=0=假绿失守即演练红）。
+#                   MUT 探针只许钉名册列名件（--target 越权=红；卡面禁项禁钉任意件）。
+#                   ★同批卫: 两作业共用 roster_enable 一枚点选（RT-E121：单上 A-6 中
+#                   假绿——A-6 与 A-2 必须同批，以共用点选机判化，不许拆单点选）。
+#   点选默认 'false'（零覆盖，既有调用方零影响）；g2_scope/g2_runs_on/g2_checkout_url/
+#   ref/g2_trial_config 基建入参沿用批2（g2_trial_config 兼载 CI_G3_* 键：dispatch
+#   面入参 ≤10 硬限的批3 参数补全通道）。
+#
 # 形态纪律（与第一批同款）：零外部 action（uses 只许本组织）/权限只读/每作业
 #   timeout-minutes ≤45/顶层 concurrency/禁提权触发/禁吞红/零 secret 引用/
 #   checkout 面内嵌（匿名 clone，零 uses 形态）。
@@ -120,7 +138,7 @@ on:
         default: ""
         type: string
       g2_trial_config:
-        description: "批2 试跑配置文件（KEY=VALUE 行，键=CI_G2_* 与 call 面同名；空=用 call 默认）"
+        description: "批2/批3 试跑配置文件（KEY=VALUE 行，键=CI_G2_*/CI_G3_* 与 call 面同名；空=用 call 默认）"
         required: false
         default: ""
         type: string
@@ -184,6 +202,53 @@ on:
         required: false
         default: ""
         type: string
+      roster_enable:
+        description: "批3 点选：A-2 名册四面对账＋A-6 变异演练（同批共用一枚点选，'true' 启用）"
+        required: false
+        default: "false"
+        type: string
+      roster_list:
+        description: "A-2 名册路径（行=在库件名，# 注释与 #KEY=<n> 声明行；缺席即红）"
+        required: false
+        default: ""
+        type: string
+      roster_root:
+        description: "A-2 在库根（在列件名相对此目录逐件工作树实位对账）"
+        required: false
+        default: ""
+        type: string
+      roster_count_key:
+        description: "A-2 件数自声明键名（#<键>=<n>；缺该行即红）"
+        required: false
+        default: "ITEMS_COUNT"
+        type: string
+      roster_min_key:
+        description: "A-2 下限自声明键名（#<键>=<n>；缺该行且 roster_count_min 空即红）"
+        required: false
+        default: "ITEMS_COUNT_MIN"
+        type: string
+      roster_count_min:
+        description: "A-2 显式下限（调用仓政策值优先于 min_key 声明；空=用声明）"
+        required: false
+        default: ""
+        type: string
+      roster_changelog:
+        description: "A-2 变更留痕面路径（登记串 '<名册basename> sha256=<hex>'；空=宽松剖面留痕对账关闭并 NOTE）"
+        required: false
+        default: ""
+        type: string
+      roster_counted_cmd:
+        description: "A-2 人口读数命令（stdout 单行非负整数，下限对账用；空=人口=在列件数）"
+        required: false
+        default: ""
+        type: string
+      mutation_target:
+        description: "A-6 演练靶件（必须为名册列名件，越权=红；空=取在列件排序首件）"
+        required: false
+        default: ""
+        type: string
+
+
 
 
   # —— workflow_dispatch（org 仓自试跑面；入参与 workflow_call 同名同义） ——
@@ -230,9 +295,14 @@ on:
         default: ""
         type: string
       g2_trial_config:
-        description: "批2 试跑配置文件（KEY=VALUE 行，键=CI_G2_* 与 call 面同名；空=用 call 默认）"
+        description: "批2/批3 试跑配置文件（KEY=VALUE 行，键=CI_G2_*/CI_G3_* 与 call 面同名；空=用 call 默认）"
         required: false
         default: ""
+        type: string
+      roster_enable:
+        description: "批3 点选：A-2 名册四面对账＋A-6 变异演练（同批共用一枚点选，'true' 启用）"
+        required: false
+        default: "false"
         type: string
 
 
@@ -2554,3 +2624,1333 @@ jobs:
           echo "批2·A-17 步2: 调用仓面（扫面=$CI_G2_LINT_PATHS）"
           python3 -I "$G2DIR/g2_secure_lint.py" check \
             --paths "$CI_G2_LINT_PATHS" $ALLOW_ARGS
+
+
+  # ---- 批3 · A-2：名册四面对账（名册在库＋自声明段核＋件数下限对账＋变更留痕） ----
+  # 卡面 .github#17 / D-90 / w06-org-roster-mutation（CI L-02）。正本形态: factory-os
+  # tools/test-manifest.list 四声明行纪律（RT-E84②③④）× all-gates.sh register_L2 对账段。
+  # 判别机 g3_roster_check.py: check 四面对账（在库/声明/下限/留痕；--require-git 版本面
+  # 前提 fail-closed——卡面禁项「禁在无 git 版本面的仓启用 A-2」）＋ selftest 夹具
+  # （真绿 3＋真红 10；删名册内一件⇒红、恢复⇒绿双腿与件数下限对账正反例全点名）。
+  # 点选: roster_enable == 'true' 才跑，默认 'false'（零覆盖）；与 A-6 mutation-drill
+  # 共用同一点选（RT-E121：A-6 与 A-2 必须同批——同批卫以共用点选机判化）。
+  roster-check:
+    name: "批3·A-2 名册四面对账（名册在库＋自声明段核＋件数下限对账＋变更留痕 diff 面）"
+    if: ${{ inputs.roster_enable == 'true' }}
+    runs-on: ${{ inputs.g2_runs_on }}
+    timeout-minutes: 45
+    env:
+      CI_G2_SCOPE: ${{ inputs.g2_scope }}
+      CI_G2_CHECKOUT_URL: ${{ inputs.g2_checkout_url }}
+      CI_G2_CHECKOUT_REF: ${{ inputs.g2_checkout_ref }}
+      CI_G2_TRIAL_CONFIG: ${{ inputs.g2_trial_config }}
+      CI_G3_ROSTER_LIST: ${{ inputs.roster_list }}
+      CI_G3_ROSTER_ROOT: ${{ inputs.roster_root }}
+      CI_G3_COUNT_KEY: ${{ inputs.roster_count_key }}
+      CI_G3_MIN_KEY: ${{ inputs.roster_min_key }}
+      CI_G3_COUNT_MIN: ${{ inputs.roster_count_min }}
+      CI_G3_CHANGELOG: ${{ inputs.roster_changelog }}
+      CI_G3_COUNTED_CMD: ${{ inputs.roster_counted_cmd }}
+    steps:
+      - name: "批3·A-2 步1·判别力自证夹具（真绿必绿＋真红必红并点名，RT-E121）"
+        run: |
+          set -eu
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g3/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          mkdir -p "$G2DIR"
+          echo "批3·A-2 步1: 判别力自证（真绿 3＋真红 10；删件红/恢复绿双腿＋件数下限正反例）"
+          cat > "$G2DIR/g3_roster_check.py" <<'G3_ROSTER_PY'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          """g3_roster_check.py — A-2 名册四面对账（org ci-gates.yml 第三批 · D-90）。
+
+          判据来源: CI 研究面 L-02（A-2 名册在库＋件数下限对账＋自声明段核＋变更留痕 diff 面，
+          卡面 w06-org-roster-mutation）。正本形态: factory-os tools/test-manifest.list
+          （RT-E84②③④ 名册/自声明/下限/留痕四声明行纪律）× tools/all-gates.sh register_L2
+          对账段（在列≡声明、sha256 登记串留痕）。org 件只移植机制：名册路径、在库根、声明
+          键名、下限、留痕面、人口读数命令全部由调用仓经 inputs 供（零仓专属假设、零校准
+          常量）。判别机内嵌于 ci-gates.yml 步1（临时目录自足、零仓依赖），步2 对调用仓
+          实名册跑（fail-closed：缺件/缺参/缺席一律红）。
+
+          四面对账（全部点名输出；任一红 ⇒ exit 1）:
+            ① 名册在库    名册文件在位；--require-git 时工作区须是 git 版本面且名册被 git
+                          跟踪（卡面禁项：禁在无 git 版本面的仓启用 A-2——fail-closed）；
+                          在列件逐件工作树实位对账（删名册内一件即红——变异探针靶面）。
+            ② 自声明段核  #<count-key>=<整数> 与 #<min-key>=<整数> 声明行各在、可解析、
+                          不重复；名册零在列件=空转红（判定面真空不判绿）。
+            ③ 件数下限对账 在列件数 ≡ 声明数（失真红）；下限 = 显式 --floor（调用仓政策值）
+                          优先，缺席取 #<min-key> 声明；人口数 = --counted-cmd stdout 单行
+                          非负整数（读不到/非整数=死手红，不可证不猜绿），未供则人口=在列
+                          件数；人口 < 下限即红（名册只许变严——摘门必须显式改清单+声明+留痕）。
+            ④ 变更留痕    --changelog 供面时：名册现 sha256 须已登记（登记串
+                          "<名册basename> sha256=<64位hex>"，grep -F 语义）；面缺席/未登记
+                          一律红。未供面=宽松剖面，只 NOTE 不红（承批2 pin_scan_dir 先例，
+                          显式登记不静默）。
+
+          契约:
+            g3_roster_check.py check --list F --root D --count-key K --min-key M
+                                     [--floor N] [--changelog C] [--counted-cmd CMD]
+                                     [--require-git]
+            g3_roster_check.py selftest   内嵌夹具：真绿必绿 + 变异必红并点名（RT-E121）
+          退出码: 0=绿（RECORDS=n 自报判定数）；1=红（逐条点名）；2=用法/环境错。
+          零第三方依赖；python3 -I 直跑。
+          """
+
+          import hashlib
+          import os
+          import re
+          import subprocess
+          import sys
+
+          DECL_RE_TMPL = r"^#\s*({key})\s*=\s*(\d+)\s*$"
+
+
+          def fail(msgs, text):
+              msgs.append(text)
+
+
+          def read_roster(path, msgs, count_key, min_key):
+              """名册面: 在列件列表 + 两枚声明。重复登记/声明缺席/重复/坏值一律点名红。"""
+              items, seen = [], set()
+              decls = {}
+              with open(path, encoding="utf-8") as fh:
+                  raw_lines = fh.read().splitlines()
+              for lineno, raw in enumerate(raw_lines, 1):
+                  line = raw.strip()
+                  if not line or line.startswith("#"):
+                      m = re.match(DECL_RE_TMPL.format(key=re.escape(count_key)), line)
+                      if m:
+                          if count_key in decls:
+                              fail(msgs, f"自声明重复登记:{count_key} (L{lineno})")
+                          decls[count_key] = int(m.group(2))
+                          continue
+                      m = re.match(DECL_RE_TMPL.format(key=re.escape(min_key)), line)
+                      if m:
+                          if min_key in decls:
+                              fail(msgs, f"自声明重复登记:{min_key} (L{lineno})")
+                          decls[min_key] = int(m.group(2))
+                          continue
+                      continue
+                  if line in seen:
+                      fail(msgs, f"名册重复登记 (L{lineno}): {line}")
+                      continue
+                  seen.add(line)
+                  items.append(line)
+              if count_key not in decls:
+                  fail(msgs, f"自声明缺席:{count_key}（声明行 #{count_key}=<n> 必在——件数无自报即不可对账）")
+              if min_key not in decls:
+                  fail(msgs, f"自声明缺席:{min_key}（声明行 #{min_key}=<n> 必在——下限无自报即不可对账）")
+              return items, decls
+
+
+          def git_face(roster_path, msgs):
+              """版本面前提（卡面禁项 fail-closed）：工作区=git 版本面 ∧ 名册被 git 跟踪。"""
+              try:
+                  p = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                                     capture_output=True, text=True, timeout=30)
+                  if p.returncode != 0 or p.stdout.strip() != "true":
+                      fail(msgs, f"版本面缺席（git rev-parse 非 true: rc={p.returncode}）——"
+                                 f"禁在无 git 版本面的仓启用 A-2（卡面禁项 fail-closed）")
+                      return
+              except (OSError, subprocess.TimeoutExpired) as exc:
+                  fail(msgs, f"版本面缺席（git 不可用: {exc}）——fail-closed")
+                  return
+              p2 = subprocess.run(["git", "ls-files", "--error-unmatch", "--", roster_path],
+                                  capture_output=True, text=True, timeout=30)
+              if p2.returncode != 0:
+                  fail(msgs, f"版本面缺席（名册未被 git 跟踪，ls-files rc={p2.returncode}）: {roster_path}"
+                             f"——禁在无 git 版本面的仓启用 A-2（卡面禁项 fail-closed）")
+
+
+          def sha256_file(path):
+              h = hashlib.sha256()
+              with open(path, "rb") as fh:
+                  for chunk in iter(lambda: fh.read(1 << 20), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+
+          def read_population(cmd, msgs):
+              """人口读数: bash -o pipefail -c CMD，stdout 单行非负整数；否则死手红。"""
+              try:
+                  p = subprocess.run(["bash", "-o", "pipefail", "-c", cmd],
+                                     capture_output=True, text=True, timeout=120)
+              except (OSError, subprocess.TimeoutExpired) as exc:
+                  fail(msgs, f"人口读数失败（cmd 异常: {exc}）——死手不猜绿")
+                  return None
+              out = (p.stdout or "").strip()
+              if p.returncode != 0 or len(out.splitlines()) != 1 or not out.isdigit():
+                  fail(msgs, f"人口读数失败（rc={p.returncode} stdout={out[:40]!r}）——"
+                             f"须单行非负整数；死手不猜绿")
+                  return None
+              return int(out)
+
+
+          def do_check(args):
+              msgs, records = [], 0
+              list_path, root = args["list"], args["root"]
+              count_key, min_key = args["count_key"], args["min_key"]
+              if not os.path.isfile(list_path):
+                  print(f"RED 名册缺席（名册在库面 fail-closed）: {list_path}")
+                  return 1
+              if not root or not os.path.isdir(root):
+                  print(f"RED 在库根缺席/非目录: {root!r}")
+                  return 1
+
+              # ①版本面前提（--require-git；先于一切对账——前提不成立即不判）
+              if args["require_git"]:
+                  pre = []
+                  git_face(list_path, pre)
+                  if pre:
+                      for e in pre:
+                          print("RED " + e)
+                      return 1
+
+              items, decls = read_roster(list_path, msgs, count_key, min_key)
+              if not items:
+                  fail(msgs, "名册空转（零在列件）——判定面真空不判绿（A-8 口径）")
+
+              # ① 名册在库：在列件逐件工作树实位
+              for it in items:
+                  records += 1
+                  p = os.path.join(root, it)
+                  if not os.path.isfile(p):
+                      fail(msgs, f"在库缺席（删名册内一件即红——变异探针靶面）: {it}")
+
+              # ③ 件数下限对账
+              declared = decls.get(count_key)
+              floor_decl = decls.get(min_key)
+              if declared is not None:
+                  records += 1
+                  if declared != len(items):
+                      fail(msgs, f"声明失真（在列 {len(items)} 件 ≠ 自声明 {count_key}={declared}）——"
+                                 f"删件/增件须同步对账改声明+留痕（A-16 纪律）")
+              floor = None
+              if args["floor"]:
+                  if not args["floor"].isdigit():
+                      fail(msgs, f"下限参非非负整数: {args['floor']!r}")
+                  else:
+                      floor = int(args["floor"])
+              elif floor_decl is not None:
+                  floor = floor_decl
+              population = None
+              if args["counted_cmd"]:
+                  population = read_population(args["counted_cmd"], msgs)
+              else:
+                  population = len(items)
+              if floor is not None and population is not None:
+                  records += 1
+                  if population < floor:
+                      fail(msgs, f"下限击穿（人口 {population} < 下限 {floor}"
+                                 f"{'（显式参）' if args['floor'] else f'（声明 {min_key}={floor_decl}）'}）——"
+                                 f"名册只许变严（增条目/抬下限）")
+                  elif population == floor:
+                      print(f"NOTE 人口 {population} = 下限 {floor}（贴下限现势——再摘任一件即红）")
+
+              # ④ 变更留痕（grep -F 语义登记串对账）
+              if args["changelog"]:
+                  records += 1
+                  clog = args["changelog"]
+                  if not os.path.isfile(clog):
+                      fail(msgs, f"留痕面缺席: {clog}——名册改动零留痕面可对账（RT-E84④ 口径 fail-closed）")
+                  else:
+                      sha = sha256_file(list_path)
+                      reg = os.path.basename(list_path) + " sha256=" + sha
+                      with open(clog, encoding="utf-8", errors="replace") as fh:
+                          hit = reg in fh.read()
+                      if not hit:
+                          fail(msgs, f"留痕缺席（名册现 sha256 未登记留痕面）——登记串: {reg}")
+              else:
+                  print("NOTE 留痕面未供（--changelog 空）——变更留痕对账关闭·宽松剖面（显式登记不静默）")
+
+              if msgs:
+                  print("A-2 名册四面对账红:")
+                  for e in msgs:
+                      print("  RED " + e)
+                  return 1
+              print(f"RECORDS={records}")
+              print(f"A-2 绿: 名册在库 {len(items)} 件全实位；自声明 {count_key}={decls.get(count_key)} ≡ 在列"
+                    f"／{min_key}={decls.get(min_key)}；下限对账 人口={population} ≥ {floor}；"
+                    f"留痕已登记" if args["changelog"] else "A-2 绿（宽松剖面·留痕面未供）")
+              return 0
+
+
+          # ---- selftest（真绿必绿 + 变异必红并点名；RT-E121） -----------------------------
+
+          def build_world(root, files, declared_count, declared_min,
+                          count_key="ITEMS_COUNT", min_key="ITEMS_COUNT_MIN",
+                          changelog=True, floor=None, counted_cmd=None):
+              """搭一座最小名册世界。files: {relpath_under_dir: content}（在库集）；声明/
+              下限/留痕/下限参/人口命令按夹具需要注变。返回 check 参数 dict。"""
+              d = os.path.join(root, "dir")
+              os.makedirs(d, exist_ok=True)
+              for rel, content in sorted(files.items()):
+                  with open(os.path.join(d, rel), "w", encoding="utf-8") as fh:
+                      fh.write(content)
+              items = sorted(files)
+              lines = ["# 夹具名册", f"#{count_key}={declared_count}", f"#{min_key}={declared_min}"]
+              lines += items
+              list_path = os.path.join(root, "roster.list")
+              with open(list_path, "w", encoding="utf-8") as fh:
+                  fh.write("\n".join(lines) + "\n")
+              args = {"list": list_path, "root": d, "count_key": count_key,
+                      "min_key": min_key, "floor": "" if floor is None else str(floor),
+                      "changelog": "", "counted_cmd": counted_cmd or "", "require_git": False}
+              if changelog:
+                  clog = os.path.join(root, "changelog.md")
+                  import hashlib as _h
+                  sha = _h.sha256(open(list_path, "rb").read()).hexdigest()
+                  with open(clog, "w", encoding="utf-8") as fh:
+                      fh.write(f"| 2026-11-07 | 夹具 | 登记串：roster.list sha256={sha} |\n")
+                  args["changelog"] = clog
+              return args
+
+
+          def run_checker(args):
+              argv = [sys.executable, "-I", os.path.abspath(sys.argv[0]), "check",
+                      "--list", args["list"], "--root", args["root"],
+                      "--count-key", args["count_key"], "--min-key", args["min_key"],
+                      "--floor", args["floor"]]
+              if args.get("changelog"):
+                  argv += ["--changelog", args["changelog"]]
+              if args.get("counted_cmd"):
+                  argv += ["--counted-cmd", args["counted_cmd"]]
+              if args.get("require_git"):
+                  argv += ["--require-git"]
+              return subprocess.run(argv, capture_output=True, text=True)
+
+
+          def do_selftest():
+              tmp = None
+              import tempfile
+              import shutil
+              tmp = tempfile.mkdtemp(prefix="g3roster-")
+              readings, fails = [], []
+
+              def case(name, args, expect_rc, marker, pre=None, post=None):
+                  if pre:
+                      pre(args)
+                  proc = run_checker(args)
+                  ok = proc.returncode == expect_rc and (marker in proc.stdout or marker in proc.stderr)
+                  readings.append(f"{name}: rc={proc.returncode} 期望={expect_rc} 点名「{marker}」"
+                                  f"{' ✓' if ok else ' ✗<<<'}")
+                  if not ok:
+                      fails.append(name)
+                      readings.append("  输出: " + (proc.stdout + proc.stderr)[:400].replace("\n", " | "))
+                  if post:
+                      post(args)
+
+              files = {"alpha.txt": "alpha\n", "beta.txt": "beta\n"}
+
+              # 真绿1：四面对账全绿（正例基线）
+              a = build_world(os.path.join(tmp, "t-green"), files, 2, 2)
+              case("真绿·四面对账基线（在库+声明+下限贴线+留痕）", a, 0, "RECORDS=")
+
+              # 真绿2：下限对账正例（显式 floor=2 = 人口 2，等界绿）
+              a = build_world(os.path.join(tmp, "t-floor-ok"), files, 2, 2, floor=2)
+              case("真绿·件数下限对账正例（显式 floor=2≡人口2）", a, 0, "RECORDS=")
+
+              # 真绿3：人口命令面（counted_cmd 读数 2 ≥ floor 2）
+              a = build_world(os.path.join(tmp, "t-cmd"), files, 2, 2, floor=2,
+                              counted_cmd="printf '2\\n'")
+              case("真绿·人口命令面读数（counted_cmd=2≥floor2）", a, 0, "RECORDS=")
+
+              # 真红1＋真绿恢复：删名册内一件⇒红（变异探针靶面）→恢复⇒绿（同一世界连续两腿）
+              a = build_world(os.path.join(tmp, "t-drop"), files, 2, 2)
+              tgt = os.path.join(a["root"], "beta.txt")
+              bak = tgt + ".probe-bak"
+
+              def _drop(_a):
+                  os.replace(tgt, bak)
+              def _restore(_a):
+                  os.replace(bak, tgt)
+              case("真红·删名册内一件⇒必红（在库缺席）", a, 1, "在库缺席", pre=_drop, post=_restore)
+              case("真绿·恢复删件⇒必绿（字节复原复绿）", a, 0, "RECORDS=")
+              readings.append(f"  恢复校验: sha256={__import__('hashlib').sha256(open(tgt,'rb').read()).hexdigest()[:12]}…")
+
+              # 真红2：声明失真（声明 3 ≠ 在列 2）
+              a = build_world(os.path.join(tmp, "t-decl"), files, 3, 2)
+              case("真红·声明失真（在列2≠声明3）", a, 1, "声明失真")
+
+              # 真红3：下限击穿（显式 floor=5 > 人口2；名册只许变严）
+              a = build_world(os.path.join(tmp, "t-floor"), files, 2, 5, floor=5)
+              case("真红·下限击穿（人口2<显式floor5）", a, 1, "下限击穿")
+
+              # 真红4：下限击穿·声明面（min_key=5 为声明下限，人口2<5）
+              a = build_world(os.path.join(tmp, "t-floordecl"), files, 2, 5)
+              case("真红·下限击穿（人口2<声明min5）", a, 1, "下限击穿")
+
+              # 真红5：自声明段缺席（count_key 行被摘）
+              a = build_world(os.path.join(tmp, "t-nodecl"), files, 2, 2)
+
+              def _strip_decl(_a):
+                  with open(_a["list"], encoding="utf-8") as fh:
+                      ls = [l for l in fh.read().splitlines() if not l.startswith(f"#{_a['count_key']}=")]
+                  with open(_a["list"], "w", encoding="utf-8") as fh:
+                      fh.write("\n".join(ls) + "\n")
+                  _a["changelog"] = ""  # 名册被改、留痕必红——本夹具只看点名「自声明缺席」，摘留痕面防混点
+              case("真红·自声明段缺席（count 声明行被摘）", a, 1, "自声明缺席", pre=_strip_decl)
+
+              # 真红6：留痕缺席（名册被改未登记新 sha）
+              a = build_world(os.path.join(tmp, "t-trail"), files, 2, 2)
+
+              def _bump(_a):
+                  with open(_a["list"], "a", encoding="utf-8") as fh:
+                      fh.write("# 改声明未留痕\n")
+              case("真红·留痕缺席（名册改而新 sha 未登记）", a, 1, "留痕缺席", pre=_bump)
+
+              # 真红7：留痕面缺席（changelog 路径不存在）
+              a = build_world(os.path.join(tmp, "t-noclog"), files, 2, 2)
+              a["changelog"] = os.path.join(tmp, "t-noclog", "no-such-changelog.md")
+              case("真红·留痕面缺席（供面路径不存在=fail-closed）", a, 1, "留痕面缺席")
+
+              # 真红8：名册本体缺席
+              a = build_world(os.path.join(tmp, "t-nolist"), files, 2, 2)
+              os.remove(a["list"])
+              case("真红·名册本体缺席（名册被删=fail-closed）", a, 1, "名册缺席")
+
+              # 真红9：名册重复登记
+              a = build_world(os.path.join(tmp, "t-dup"), files, 2, 2)
+              a["changelog"] = ""  # 改名册会触发留痕红混点——本夹具摘留痕面
+
+              def _dup(_a):
+                  with open(_a["list"], "a", encoding="utf-8") as fh:
+                      fh.write("alpha.txt\n")
+              case("真红·名册重复登记", a, 1, "重复登记", pre=_dup)
+
+              # 真红10：人口读数死手（counted_cmd 非零退出/非整数——不可证不猜绿）
+              a = build_world(os.path.join(tmp, "t-deadhand"), files, 2, 2, floor=2,
+                              counted_cmd="printf 'x\\n'; exit 3")
+              case("真红·人口读数死手（counted_cmd 非整数非零退）", a, 1, "人口读数失败")
+
+              # 真红11：空转（零在列件——判定面真空不判绿）
+              a = build_world(os.path.join(tmp, "t-vac"), {}, 0, 2)
+              a["changelog"] = ""
+              case("真红·名册空转（零在列件）", a, 1, "空转")
+
+              # 真红12：版本面前提（--require-git 于非 git 世界=红）
+              a = build_world(os.path.join(tmp, "t-git"), files, 2, 2)
+              a["require_git"] = True
+              case("真红·版本面前提（非 git 工作区启用 A-2=红）", a, 1, "版本面缺席")
+
+              shutil.rmtree(tmp, ignore_errors=True)
+              print("—— A-2 selftest 夹具读数（件数下限对账正反例＋删件红/恢复绿）——")
+              for r in readings:
+                  print("  " + r)
+              if fails:
+                  print(f"A-2 selftest 红: {len(fails)} 夹具失守 -> {fails}")
+                  return 1
+              print("A-2 selftest 全绿 exit 0（真绿 3 必绿＋变异 10 必红且点名；删件红/恢复绿双腿在证）")
+              return 0
+
+
+          def main(argv):
+              if len(argv) >= 2 and argv[1] == "selftest":
+                  return do_selftest()
+              if len(argv) >= 2 and argv[1] == "check":
+                  args = {"list": "", "root": "", "count_key": "", "min_key": "",
+                          "floor": "", "changelog": "", "counted_cmd": "", "require_git": ""}
+                  i = 2
+                  while i < len(argv):
+                      key = argv[i].lstrip("-").replace("-", "_")
+                      if key == "require_git":
+                          args["require_git"] = "1"
+                          i += 1
+                          continue
+                      if key in args and i + 1 < len(argv):
+                          args[key] = argv[i + 1]
+                          i += 2
+                      else:
+                          print(f"usage 错: {argv[i]}", file=sys.stderr)
+                          return 2
+                  for k in ("list", "root", "count_key", "min_key"):
+                      if not args[k]:
+                          print(f"usage 错: --{k.replace('_','-')} 必填（缺参=不可判，fail-closed）",
+                                file=sys.stderr)
+                          return 2
+                  return do_check(args)
+              print("usage: g3_roster_check.py check --list F --root D --count-key K --min-key M "
+                    "[--floor N] [--changelog C] [--counted-cmd CMD] [--require-git] | selftest",
+                    file=sys.stderr)
+              return 2
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          G3_ROSTER_PY
+          python3 -I "$G2DIR/g3_roster_check.py" selftest
+      - name: "批3·A-2 步2·调用仓面（实名册四面对账；缺参/缺席/失真一律红）"
+        if: ${{ inputs.g2_scope != 'fixtures-only' }}
+        run: |
+          set -eu
+          # 检出面（可复用件跑在调用方工作区；匿名 clone 零 uses 形态）
+          if [ -n "$CI_G2_CHECKOUT_URL" ]; then
+            REF="${CI_G2_CHECKOUT_REF:-}"
+            attempt=0
+            until [ "$attempt" -ge 3 ]; do
+              if [ -n "$(ls -A . 2>/dev/null)" ]; then
+                find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+              fi
+              CLONE_OK=0
+              if printf '%s' "$REF" | grep -qE '^[0-9a-f]{40}$'; then
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then
+                  if git fetch --depth 1 origin "$REF" && git checkout --quiet --detach "$REF"; then
+                    CLONE_OK=1
+                  fi
+                fi
+              elif [ -n "$REF" ]; then
+                if git clone --depth 1 --branch "$REF" -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              else
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              fi
+              if [ "$CLONE_OK" = 1 ]; then break; fi
+              attempt=$((attempt + 1))
+              echo "批2 检出失败（第 $attempt/3 次）——5s 后重试" >&2
+              sleep 5
+            done
+            if [ "$attempt" -ge 3 ]; then
+              echo "RED 批2 检出面三次皆败（直连抖动/私仓未带凭据面）——fail-closed" >&2
+              exit 2
+            fi
+          elif [ -z "$(ls -A . 2>/dev/null)" ]; then
+            echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
+            exit 2
+          fi
+
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G3_* 同名；
+          # 只填显式入参留空的键——显式入参优先。每作业独立装配（D-89 补丁2 形制））
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G3K in CI_G3_ROSTER_LIST CI_G3_ROSTER_ROOT CI_G3_COUNT_KEY CI_G3_MIN_KEY CI_G3_COUNT_MIN CI_G3_CHANGELOG CI_G3_COUNTED_CMD; do
+              G3CUR="$(eval "printf '%s' \"\${$G3K:-}\"")"
+              [ -n "$G3CUR" ] && continue
+              G3V="$(grep -m1 "^$G3K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G3V" ] && eval "export $G3K=\"$G3V\""
+            done
+            echo "批3 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
+          fi
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g3/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          [ -f "$G2DIR/g3_roster_check.py" ] || { echo "RED 判别机缺席（步1 未落 G2DIR=$G2DIR）——fail-closed" >&2; exit 2; }
+          if [ -z "${CI_G3_ROSTER_LIST:-}" ] || [ -z "${CI_G3_ROSTER_ROOT:-}" ]; then
+            echo "RED 缺参（roster_list/roster_root 必填——显式入参或试跑配置 CI_G3_ROSTER_LIST/CI_G3_ROSTER_ROOT）——不可判 fail-closed" >&2
+            exit 2
+          fi
+          EXTRA_ARGS=()
+          if [ -n "${CI_G3_COUNT_MIN:-}" ]; then EXTRA_ARGS+=(--floor "$CI_G3_COUNT_MIN"); fi
+          if [ -n "${CI_G3_CHANGELOG:-}" ]; then EXTRA_ARGS+=(--changelog "$CI_G3_CHANGELOG"); fi
+          if [ -n "${CI_G3_COUNTED_CMD:-}" ]; then EXTRA_ARGS+=(--counted-cmd "$CI_G3_COUNTED_CMD"); fi
+          echo "批3·A-2 步2: 调用仓实名册四面对账（名册=$CI_G3_ROSTER_LIST 根=$CI_G3_ROSTER_ROOT）"
+          python3 -I "$G2DIR/g3_roster_check.py" check \
+            --list "$CI_G3_ROSTER_LIST" --root "$CI_G3_ROSTER_ROOT" \
+            --count-key "${CI_G3_COUNT_KEY:-ITEMS_COUNT}" --min-key "${CI_G3_MIN_KEY:-ITEMS_COUNT_MIN}" \
+            --require-git ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+
+
+  # ---- 批3 · A-6：变异演练（对名册钉面件做删改探针⇒必须红；与 A-2 同批——RT-E121） ----
+  # 卡面 .github#17 / D-90。判别机 g3_mutation_drill.py: drill 三腿（基线绿→删名册列名件
+  # ⇒A-2 必红并点名「在库缺席」→字节级复原 sha256 逐位校验⇒A-2 必绿；删件腿 rc=0 即假绿
+  # 失守=演练红）。卡面禁项机判化: MUT 探针只许钉名册列名件（--target 越权=红，禁钉任意
+  # 件）；演练在调用仓工作树做删-验-还（瞬时变异零提交，复原失守=exit 2 fail-closed 停手）。
+  # 点选: 与 A-2 共用 roster_enable（同批卫——单上 A-6 中假绿，RT-E121）。
+  mutation-drill:
+    name: "批3·A-6 变异演练（删名册列名件⇒必红／复原⇒必绿；与 A-2 同批）"
+    if: ${{ inputs.roster_enable == 'true' }}
+    runs-on: ${{ inputs.g2_runs_on }}
+    timeout-minutes: 45
+    env:
+      CI_G2_SCOPE: ${{ inputs.g2_scope }}
+      CI_G2_CHECKOUT_URL: ${{ inputs.g2_checkout_url }}
+      CI_G2_CHECKOUT_REF: ${{ inputs.g2_checkout_ref }}
+      CI_G2_TRIAL_CONFIG: ${{ inputs.g2_trial_config }}
+      CI_G3_ROSTER_LIST: ${{ inputs.roster_list }}
+      CI_G3_ROSTER_ROOT: ${{ inputs.roster_root }}
+      CI_G3_COUNT_KEY: ${{ inputs.roster_count_key }}
+      CI_G3_MIN_KEY: ${{ inputs.roster_min_key }}
+      CI_G3_COUNT_MIN: ${{ inputs.roster_count_min }}
+      CI_G3_CHANGELOG: ${{ inputs.roster_changelog }}
+      CI_G3_COUNTED_CMD: ${{ inputs.roster_counted_cmd }}
+      CI_G3_MUT_TARGET: ${{ inputs.mutation_target }}
+    steps:
+      - name: "批3·A-6 步1·判别力自证夹具（演练全腿真绿＋越权/基线变异必红并点名）"
+        run: |
+          set -eu
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g3/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          mkdir -p "$G2DIR"
+          echo "批3·A-6 步1: 判别力自证（真绿 2＋真红 3；删件红/恢复绿全腿在证）"
+          cat > "$G2DIR/g3_roster_check.py" <<'G3_ROSTER_PY'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          """g3_roster_check.py — A-2 名册四面对账（org ci-gates.yml 第三批 · D-90）。
+
+          判据来源: CI 研究面 L-02（A-2 名册在库＋件数下限对账＋自声明段核＋变更留痕 diff 面，
+          卡面 w06-org-roster-mutation）。正本形态: factory-os tools/test-manifest.list
+          （RT-E84②③④ 名册/自声明/下限/留痕四声明行纪律）× tools/all-gates.sh register_L2
+          对账段（在列≡声明、sha256 登记串留痕）。org 件只移植机制：名册路径、在库根、声明
+          键名、下限、留痕面、人口读数命令全部由调用仓经 inputs 供（零仓专属假设、零校准
+          常量）。判别机内嵌于 ci-gates.yml 步1（临时目录自足、零仓依赖），步2 对调用仓
+          实名册跑（fail-closed：缺件/缺参/缺席一律红）。
+
+          四面对账（全部点名输出；任一红 ⇒ exit 1）:
+            ① 名册在库    名册文件在位；--require-git 时工作区须是 git 版本面且名册被 git
+                          跟踪（卡面禁项：禁在无 git 版本面的仓启用 A-2——fail-closed）；
+                          在列件逐件工作树实位对账（删名册内一件即红——变异探针靶面）。
+            ② 自声明段核  #<count-key>=<整数> 与 #<min-key>=<整数> 声明行各在、可解析、
+                          不重复；名册零在列件=空转红（判定面真空不判绿）。
+            ③ 件数下限对账 在列件数 ≡ 声明数（失真红）；下限 = 显式 --floor（调用仓政策值）
+                          优先，缺席取 #<min-key> 声明；人口数 = --counted-cmd stdout 单行
+                          非负整数（读不到/非整数=死手红，不可证不猜绿），未供则人口=在列
+                          件数；人口 < 下限即红（名册只许变严——摘门必须显式改清单+声明+留痕）。
+            ④ 变更留痕    --changelog 供面时：名册现 sha256 须已登记（登记串
+                          "<名册basename> sha256=<64位hex>"，grep -F 语义）；面缺席/未登记
+                          一律红。未供面=宽松剖面，只 NOTE 不红（承批2 pin_scan_dir 先例，
+                          显式登记不静默）。
+
+          契约:
+            g3_roster_check.py check --list F --root D --count-key K --min-key M
+                                     [--floor N] [--changelog C] [--counted-cmd CMD]
+                                     [--require-git]
+            g3_roster_check.py selftest   内嵌夹具：真绿必绿 + 变异必红并点名（RT-E121）
+          退出码: 0=绿（RECORDS=n 自报判定数）；1=红（逐条点名）；2=用法/环境错。
+          零第三方依赖；python3 -I 直跑。
+          """
+
+          import hashlib
+          import os
+          import re
+          import subprocess
+          import sys
+
+          DECL_RE_TMPL = r"^#\s*({key})\s*=\s*(\d+)\s*$"
+
+
+          def fail(msgs, text):
+              msgs.append(text)
+
+
+          def read_roster(path, msgs, count_key, min_key):
+              """名册面: 在列件列表 + 两枚声明。重复登记/声明缺席/重复/坏值一律点名红。"""
+              items, seen = [], set()
+              decls = {}
+              with open(path, encoding="utf-8") as fh:
+                  raw_lines = fh.read().splitlines()
+              for lineno, raw in enumerate(raw_lines, 1):
+                  line = raw.strip()
+                  if not line or line.startswith("#"):
+                      m = re.match(DECL_RE_TMPL.format(key=re.escape(count_key)), line)
+                      if m:
+                          if count_key in decls:
+                              fail(msgs, f"自声明重复登记:{count_key} (L{lineno})")
+                          decls[count_key] = int(m.group(2))
+                          continue
+                      m = re.match(DECL_RE_TMPL.format(key=re.escape(min_key)), line)
+                      if m:
+                          if min_key in decls:
+                              fail(msgs, f"自声明重复登记:{min_key} (L{lineno})")
+                          decls[min_key] = int(m.group(2))
+                          continue
+                      continue
+                  if line in seen:
+                      fail(msgs, f"名册重复登记 (L{lineno}): {line}")
+                      continue
+                  seen.add(line)
+                  items.append(line)
+              if count_key not in decls:
+                  fail(msgs, f"自声明缺席:{count_key}（声明行 #{count_key}=<n> 必在——件数无自报即不可对账）")
+              if min_key not in decls:
+                  fail(msgs, f"自声明缺席:{min_key}（声明行 #{min_key}=<n> 必在——下限无自报即不可对账）")
+              return items, decls
+
+
+          def git_face(roster_path, msgs):
+              """版本面前提（卡面禁项 fail-closed）：工作区=git 版本面 ∧ 名册被 git 跟踪。"""
+              try:
+                  p = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                                     capture_output=True, text=True, timeout=30)
+                  if p.returncode != 0 or p.stdout.strip() != "true":
+                      fail(msgs, f"版本面缺席（git rev-parse 非 true: rc={p.returncode}）——"
+                                 f"禁在无 git 版本面的仓启用 A-2（卡面禁项 fail-closed）")
+                      return
+              except (OSError, subprocess.TimeoutExpired) as exc:
+                  fail(msgs, f"版本面缺席（git 不可用: {exc}）——fail-closed")
+                  return
+              p2 = subprocess.run(["git", "ls-files", "--error-unmatch", "--", roster_path],
+                                  capture_output=True, text=True, timeout=30)
+              if p2.returncode != 0:
+                  fail(msgs, f"版本面缺席（名册未被 git 跟踪，ls-files rc={p2.returncode}）: {roster_path}"
+                             f"——禁在无 git 版本面的仓启用 A-2（卡面禁项 fail-closed）")
+
+
+          def sha256_file(path):
+              h = hashlib.sha256()
+              with open(path, "rb") as fh:
+                  for chunk in iter(lambda: fh.read(1 << 20), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+
+          def read_population(cmd, msgs):
+              """人口读数: bash -o pipefail -c CMD，stdout 单行非负整数；否则死手红。"""
+              try:
+                  p = subprocess.run(["bash", "-o", "pipefail", "-c", cmd],
+                                     capture_output=True, text=True, timeout=120)
+              except (OSError, subprocess.TimeoutExpired) as exc:
+                  fail(msgs, f"人口读数失败（cmd 异常: {exc}）——死手不猜绿")
+                  return None
+              out = (p.stdout or "").strip()
+              if p.returncode != 0 or len(out.splitlines()) != 1 or not out.isdigit():
+                  fail(msgs, f"人口读数失败（rc={p.returncode} stdout={out[:40]!r}）——"
+                             f"须单行非负整数；死手不猜绿")
+                  return None
+              return int(out)
+
+
+          def do_check(args):
+              msgs, records = [], 0
+              list_path, root = args["list"], args["root"]
+              count_key, min_key = args["count_key"], args["min_key"]
+              if not os.path.isfile(list_path):
+                  print(f"RED 名册缺席（名册在库面 fail-closed）: {list_path}")
+                  return 1
+              if not root or not os.path.isdir(root):
+                  print(f"RED 在库根缺席/非目录: {root!r}")
+                  return 1
+
+              # ①版本面前提（--require-git；先于一切对账——前提不成立即不判）
+              if args["require_git"]:
+                  pre = []
+                  git_face(list_path, pre)
+                  if pre:
+                      for e in pre:
+                          print("RED " + e)
+                      return 1
+
+              items, decls = read_roster(list_path, msgs, count_key, min_key)
+              if not items:
+                  fail(msgs, "名册空转（零在列件）——判定面真空不判绿（A-8 口径）")
+
+              # ① 名册在库：在列件逐件工作树实位
+              for it in items:
+                  records += 1
+                  p = os.path.join(root, it)
+                  if not os.path.isfile(p):
+                      fail(msgs, f"在库缺席（删名册内一件即红——变异探针靶面）: {it}")
+
+              # ③ 件数下限对账
+              declared = decls.get(count_key)
+              floor_decl = decls.get(min_key)
+              if declared is not None:
+                  records += 1
+                  if declared != len(items):
+                      fail(msgs, f"声明失真（在列 {len(items)} 件 ≠ 自声明 {count_key}={declared}）——"
+                                 f"删件/增件须同步对账改声明+留痕（A-16 纪律）")
+              floor = None
+              if args["floor"]:
+                  if not args["floor"].isdigit():
+                      fail(msgs, f"下限参非非负整数: {args['floor']!r}")
+                  else:
+                      floor = int(args["floor"])
+              elif floor_decl is not None:
+                  floor = floor_decl
+              population = None
+              if args["counted_cmd"]:
+                  population = read_population(args["counted_cmd"], msgs)
+              else:
+                  population = len(items)
+              if floor is not None and population is not None:
+                  records += 1
+                  if population < floor:
+                      fail(msgs, f"下限击穿（人口 {population} < 下限 {floor}"
+                                 f"{'（显式参）' if args['floor'] else f'（声明 {min_key}={floor_decl}）'}）——"
+                                 f"名册只许变严（增条目/抬下限）")
+                  elif population == floor:
+                      print(f"NOTE 人口 {population} = 下限 {floor}（贴下限现势——再摘任一件即红）")
+
+              # ④ 变更留痕（grep -F 语义登记串对账）
+              if args["changelog"]:
+                  records += 1
+                  clog = args["changelog"]
+                  if not os.path.isfile(clog):
+                      fail(msgs, f"留痕面缺席: {clog}——名册改动零留痕面可对账（RT-E84④ 口径 fail-closed）")
+                  else:
+                      sha = sha256_file(list_path)
+                      reg = os.path.basename(list_path) + " sha256=" + sha
+                      with open(clog, encoding="utf-8", errors="replace") as fh:
+                          hit = reg in fh.read()
+                      if not hit:
+                          fail(msgs, f"留痕缺席（名册现 sha256 未登记留痕面）——登记串: {reg}")
+              else:
+                  print("NOTE 留痕面未供（--changelog 空）——变更留痕对账关闭·宽松剖面（显式登记不静默）")
+
+              if msgs:
+                  print("A-2 名册四面对账红:")
+                  for e in msgs:
+                      print("  RED " + e)
+                  return 1
+              print(f"RECORDS={records}")
+              print(f"A-2 绿: 名册在库 {len(items)} 件全实位；自声明 {count_key}={decls.get(count_key)} ≡ 在列"
+                    f"／{min_key}={decls.get(min_key)}；下限对账 人口={population} ≥ {floor}；"
+                    f"留痕已登记" if args["changelog"] else "A-2 绿（宽松剖面·留痕面未供）")
+              return 0
+
+
+          # ---- selftest（真绿必绿 + 变异必红并点名；RT-E121） -----------------------------
+
+          def build_world(root, files, declared_count, declared_min,
+                          count_key="ITEMS_COUNT", min_key="ITEMS_COUNT_MIN",
+                          changelog=True, floor=None, counted_cmd=None):
+              """搭一座最小名册世界。files: {relpath_under_dir: content}（在库集）；声明/
+              下限/留痕/下限参/人口命令按夹具需要注变。返回 check 参数 dict。"""
+              d = os.path.join(root, "dir")
+              os.makedirs(d, exist_ok=True)
+              for rel, content in sorted(files.items()):
+                  with open(os.path.join(d, rel), "w", encoding="utf-8") as fh:
+                      fh.write(content)
+              items = sorted(files)
+              lines = ["# 夹具名册", f"#{count_key}={declared_count}", f"#{min_key}={declared_min}"]
+              lines += items
+              list_path = os.path.join(root, "roster.list")
+              with open(list_path, "w", encoding="utf-8") as fh:
+                  fh.write("\n".join(lines) + "\n")
+              args = {"list": list_path, "root": d, "count_key": count_key,
+                      "min_key": min_key, "floor": "" if floor is None else str(floor),
+                      "changelog": "", "counted_cmd": counted_cmd or "", "require_git": False}
+              if changelog:
+                  clog = os.path.join(root, "changelog.md")
+                  import hashlib as _h
+                  sha = _h.sha256(open(list_path, "rb").read()).hexdigest()
+                  with open(clog, "w", encoding="utf-8") as fh:
+                      fh.write(f"| 2026-11-07 | 夹具 | 登记串：roster.list sha256={sha} |\n")
+                  args["changelog"] = clog
+              return args
+
+
+          def run_checker(args):
+              argv = [sys.executable, "-I", os.path.abspath(sys.argv[0]), "check",
+                      "--list", args["list"], "--root", args["root"],
+                      "--count-key", args["count_key"], "--min-key", args["min_key"],
+                      "--floor", args["floor"]]
+              if args.get("changelog"):
+                  argv += ["--changelog", args["changelog"]]
+              if args.get("counted_cmd"):
+                  argv += ["--counted-cmd", args["counted_cmd"]]
+              if args.get("require_git"):
+                  argv += ["--require-git"]
+              return subprocess.run(argv, capture_output=True, text=True)
+
+
+          def do_selftest():
+              tmp = None
+              import tempfile
+              import shutil
+              tmp = tempfile.mkdtemp(prefix="g3roster-")
+              readings, fails = [], []
+
+              def case(name, args, expect_rc, marker, pre=None, post=None):
+                  if pre:
+                      pre(args)
+                  proc = run_checker(args)
+                  ok = proc.returncode == expect_rc and (marker in proc.stdout or marker in proc.stderr)
+                  readings.append(f"{name}: rc={proc.returncode} 期望={expect_rc} 点名「{marker}」"
+                                  f"{' ✓' if ok else ' ✗<<<'}")
+                  if not ok:
+                      fails.append(name)
+                      readings.append("  输出: " + (proc.stdout + proc.stderr)[:400].replace("\n", " | "))
+                  if post:
+                      post(args)
+
+              files = {"alpha.txt": "alpha\n", "beta.txt": "beta\n"}
+
+              # 真绿1：四面对账全绿（正例基线）
+              a = build_world(os.path.join(tmp, "t-green"), files, 2, 2)
+              case("真绿·四面对账基线（在库+声明+下限贴线+留痕）", a, 0, "RECORDS=")
+
+              # 真绿2：下限对账正例（显式 floor=2 = 人口 2，等界绿）
+              a = build_world(os.path.join(tmp, "t-floor-ok"), files, 2, 2, floor=2)
+              case("真绿·件数下限对账正例（显式 floor=2≡人口2）", a, 0, "RECORDS=")
+
+              # 真绿3：人口命令面（counted_cmd 读数 2 ≥ floor 2）
+              a = build_world(os.path.join(tmp, "t-cmd"), files, 2, 2, floor=2,
+                              counted_cmd="printf '2\\n'")
+              case("真绿·人口命令面读数（counted_cmd=2≥floor2）", a, 0, "RECORDS=")
+
+              # 真红1＋真绿恢复：删名册内一件⇒红（变异探针靶面）→恢复⇒绿（同一世界连续两腿）
+              a = build_world(os.path.join(tmp, "t-drop"), files, 2, 2)
+              tgt = os.path.join(a["root"], "beta.txt")
+              bak = tgt + ".probe-bak"
+
+              def _drop(_a):
+                  os.replace(tgt, bak)
+              def _restore(_a):
+                  os.replace(bak, tgt)
+              case("真红·删名册内一件⇒必红（在库缺席）", a, 1, "在库缺席", pre=_drop, post=_restore)
+              case("真绿·恢复删件⇒必绿（字节复原复绿）", a, 0, "RECORDS=")
+              readings.append(f"  恢复校验: sha256={__import__('hashlib').sha256(open(tgt,'rb').read()).hexdigest()[:12]}…")
+
+              # 真红2：声明失真（声明 3 ≠ 在列 2）
+              a = build_world(os.path.join(tmp, "t-decl"), files, 3, 2)
+              case("真红·声明失真（在列2≠声明3）", a, 1, "声明失真")
+
+              # 真红3：下限击穿（显式 floor=5 > 人口2；名册只许变严）
+              a = build_world(os.path.join(tmp, "t-floor"), files, 2, 5, floor=5)
+              case("真红·下限击穿（人口2<显式floor5）", a, 1, "下限击穿")
+
+              # 真红4：下限击穿·声明面（min_key=5 为声明下限，人口2<5）
+              a = build_world(os.path.join(tmp, "t-floordecl"), files, 2, 5)
+              case("真红·下限击穿（人口2<声明min5）", a, 1, "下限击穿")
+
+              # 真红5：自声明段缺席（count_key 行被摘）
+              a = build_world(os.path.join(tmp, "t-nodecl"), files, 2, 2)
+
+              def _strip_decl(_a):
+                  with open(_a["list"], encoding="utf-8") as fh:
+                      ls = [l for l in fh.read().splitlines() if not l.startswith(f"#{_a['count_key']}=")]
+                  with open(_a["list"], "w", encoding="utf-8") as fh:
+                      fh.write("\n".join(ls) + "\n")
+                  _a["changelog"] = ""  # 名册被改、留痕必红——本夹具只看点名「自声明缺席」，摘留痕面防混点
+              case("真红·自声明段缺席（count 声明行被摘）", a, 1, "自声明缺席", pre=_strip_decl)
+
+              # 真红6：留痕缺席（名册被改未登记新 sha）
+              a = build_world(os.path.join(tmp, "t-trail"), files, 2, 2)
+
+              def _bump(_a):
+                  with open(_a["list"], "a", encoding="utf-8") as fh:
+                      fh.write("# 改声明未留痕\n")
+              case("真红·留痕缺席（名册改而新 sha 未登记）", a, 1, "留痕缺席", pre=_bump)
+
+              # 真红7：留痕面缺席（changelog 路径不存在）
+              a = build_world(os.path.join(tmp, "t-noclog"), files, 2, 2)
+              a["changelog"] = os.path.join(tmp, "t-noclog", "no-such-changelog.md")
+              case("真红·留痕面缺席（供面路径不存在=fail-closed）", a, 1, "留痕面缺席")
+
+              # 真红8：名册本体缺席
+              a = build_world(os.path.join(tmp, "t-nolist"), files, 2, 2)
+              os.remove(a["list"])
+              case("真红·名册本体缺席（名册被删=fail-closed）", a, 1, "名册缺席")
+
+              # 真红9：名册重复登记
+              a = build_world(os.path.join(tmp, "t-dup"), files, 2, 2)
+              a["changelog"] = ""  # 改名册会触发留痕红混点——本夹具摘留痕面
+
+              def _dup(_a):
+                  with open(_a["list"], "a", encoding="utf-8") as fh:
+                      fh.write("alpha.txt\n")
+              case("真红·名册重复登记", a, 1, "重复登记", pre=_dup)
+
+              # 真红10：人口读数死手（counted_cmd 非零退出/非整数——不可证不猜绿）
+              a = build_world(os.path.join(tmp, "t-deadhand"), files, 2, 2, floor=2,
+                              counted_cmd="printf 'x\\n'; exit 3")
+              case("真红·人口读数死手（counted_cmd 非整数非零退）", a, 1, "人口读数失败")
+
+              # 真红11：空转（零在列件——判定面真空不判绿）
+              a = build_world(os.path.join(tmp, "t-vac"), {}, 0, 2)
+              a["changelog"] = ""
+              case("真红·名册空转（零在列件）", a, 1, "空转")
+
+              # 真红12：版本面前提（--require-git 于非 git 世界=红）
+              a = build_world(os.path.join(tmp, "t-git"), files, 2, 2)
+              a["require_git"] = True
+              case("真红·版本面前提（非 git 工作区启用 A-2=红）", a, 1, "版本面缺席")
+
+              shutil.rmtree(tmp, ignore_errors=True)
+              print("—— A-2 selftest 夹具读数（件数下限对账正反例＋删件红/恢复绿）——")
+              for r in readings:
+                  print("  " + r)
+              if fails:
+                  print(f"A-2 selftest 红: {len(fails)} 夹具失守 -> {fails}")
+                  return 1
+              print("A-2 selftest 全绿 exit 0（真绿 3 必绿＋变异 10 必红且点名；删件红/恢复绿双腿在证）")
+              return 0
+
+
+          def main(argv):
+              if len(argv) >= 2 and argv[1] == "selftest":
+                  return do_selftest()
+              if len(argv) >= 2 and argv[1] == "check":
+                  args = {"list": "", "root": "", "count_key": "", "min_key": "",
+                          "floor": "", "changelog": "", "counted_cmd": "", "require_git": ""}
+                  i = 2
+                  while i < len(argv):
+                      key = argv[i].lstrip("-").replace("-", "_")
+                      if key == "require_git":
+                          args["require_git"] = "1"
+                          i += 1
+                          continue
+                      if key in args and i + 1 < len(argv):
+                          args[key] = argv[i + 1]
+                          i += 2
+                      else:
+                          print(f"usage 错: {argv[i]}", file=sys.stderr)
+                          return 2
+                  for k in ("list", "root", "count_key", "min_key"):
+                      if not args[k]:
+                          print(f"usage 错: --{k.replace('_','-')} 必填（缺参=不可判，fail-closed）",
+                                file=sys.stderr)
+                          return 2
+                  return do_check(args)
+              print("usage: g3_roster_check.py check --list F --root D --count-key K --min-key M "
+                    "[--floor N] [--changelog C] [--counted-cmd CMD] [--require-git] | selftest",
+                    file=sys.stderr)
+              return 2
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          G3_ROSTER_PY
+          cat > "$G2DIR/g3_mutation_drill.py" <<'G3_DRILL_PY'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          """g3_mutation_drill.py — A-6 变异演练（org ci-gates.yml 第三批 · D-90）。
+
+          判据来源: CI 研究面 L-02（A-6 MUT 探针与 A-2 名册门同批落地，卡面
+          w06-org-roster-mutation；RT-E121 纪律：单上 A-6 中假绿，必须同批——本件只对
+          A-2 判别机 g3_roster_check.py 做删改探针，两件同批嵌入 ci-gates.yml）。
+          卡面禁项双钉:
+            · MUT 探针只许钉名册列名件（--target 必须在名册在列集内；越权=红 fail-closed，
+              禁钉任意件）。
+            · 演练在调用仓工作树做删-验-还三腿：把靶件搬出→A-2 必红（点名「在库缺席」）→
+              字节级复原（sha256 逐位校验，复原失守=exit 2 fail-closed 停手）→A-2 必绿。
+              恢复腿任何非绿=红（门判别力失守）；删件腿任何非红（尤其 rc=0）=假绿失守=红。
+
+          契约:
+            g3_mutation_drill.py drill --checker PATH --list F --root D --count-key K
+                                       --min-key M [--floor N] [--changelog C]
+                                       [--counted-cmd CMD] [--target NAME] [--require-git]
+            g3_mutation_drill.py selftest   内嵌夹具：演练全腿真绿 + 变异必红并点名（RT-E121）
+          退出码: 0=三腿全按期望（基线绿/删件红/恢复绿）；1=演练失守（门假绿/门误红/越权探针）；
+                  2=用法/环境错（含复原字节校验失守）。
+          零第三方依赖；python3 -I 直跑。
+          """
+
+          import hashlib
+          import os
+          import subprocess
+          import sys
+
+
+
+          def sha256_file(path):
+              h = hashlib.sha256()
+              with open(path, "rb") as fh:
+                  for chunk in iter(lambda: fh.read(1 << 20), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+
+          def roster_items(list_path):
+              items = []
+              with open(list_path, encoding="utf-8") as fh:
+                  for raw in fh:
+                      line = raw.strip()
+                      if line and not line.startswith("#"):
+                          items.append(line)
+              return items
+
+
+          def run_checker(checker, args):
+              argv = [sys.executable, "-I", checker, "check",
+                      "--list", args["list"], "--root", args["root"],
+                      "--count-key", args["count_key"], "--min-key", args["min_key"],
+                      "--floor", args["floor"]]
+              if args.get("changelog"):
+                  argv += ["--changelog", args["changelog"]]
+              if args.get("counted_cmd"):
+                  argv += ["--counted-cmd", args["counted_cmd"]]
+              if args.get("require_git"):
+                  argv += ["--require-git"]
+              return subprocess.run(argv, capture_output=True, text=True)
+
+
+          def do_drill(args):
+              legs, fails = [], []
+              checker = args["checker"]
+              list_path, root = args["list"], args["root"]
+              if not os.path.isfile(checker):
+                  print(f"RED 判别机缺席（--checker 不可读）: {checker}")
+                  return 2
+              if not os.path.isfile(list_path):
+                  print(f"RED 名册缺席: {list_path}")
+                  return 2
+              if not os.path.isdir(root):
+                  print(f"RED 在库根缺席/非目录: {root!r}")
+                  return 2
+
+              # 腿0·基线绿：未变异世界 A-2 必绿（基线不绿=门误红，演练无从谈起）
+              proc = run_checker(checker, args)
+              base_rc = proc.returncode
+              legs.append(f"基线探针: rc={base_rc} 期望=0 {'✓' if base_rc == 0 else '✗<<<'}")
+              if base_rc != 0:
+                  fails.append("基线误红")
+                  legs.append("  基线输出: " + (proc.stdout + proc.stderr)[:300].replace("\n", " | "))
+
+              # 靶面选择：--target 必须是名册列名件（MUT 探针禁钉任意件——越权=红）
+              items = roster_items(list_path)
+              target = args["target"]
+              if target:
+                  if target not in items:
+                      print("A-6 变异演练红:")
+                      for l in legs:
+                          print("  " + l)
+                      print(f"  RED 探针越权（--target 非名册列名件，MUT 探针禁钉任意件）: {target}")
+                      return 1
+              else:
+                  if not items:
+                      print("A-6 变异演练红:")
+                      for l in legs:
+                          print("  " + l)
+                      print("  RED 名册零在列件——演练无靶可钉（名册空转=fail-closed）")
+                      return 1
+                  target = sorted(items)[0]
+              tgt_path = os.path.join(root, target)
+              if not os.path.isfile(tgt_path):
+                  print(f"RED 靶件现势缺席（{target}）——演练要求基线在位")
+                  return 2
+
+              if base_rc == 0:
+                  # 腿1·删件探针：靶件搬出→A-2 必红并点名「在库缺席」；rc=0 即假绿失守
+                  # 备份件放靶件同目录（同设备原子 rename；后缀 .g3mut-bak 不入 *.py 类计数面）
+                  bak_path = tgt_path + ".g3mut-bak"
+                  if os.path.exists(bak_path):
+                      print(f"RED 备份位被占用（疑似上次演练残留）: {bak_path}——fail-closed 停手")
+                      return 2
+                  sha_before = sha256_file(tgt_path)
+                  os.replace(tgt_path, bak_path)
+                  sha_after = ""
+                  try:
+                      proc = run_checker(checker, args)
+                      rc = proc.returncode
+                      named = "在库缺席" in (proc.stdout + proc.stderr)
+                      legs.append(f"删件探针（钉名册列名件 {target}）: rc={rc} 期望=1 点名「在库缺席」"
+                                  f"{' ✓ 必红' if rc == 1 and named else ' ✗<<<'}")
+                      if rc == 0:
+                          fails.append("删件未红（假绿——RT-E121 失守）")
+                      elif rc != 1 or not named:
+                          fails.append(f"删件探针异常态 rc={rc} 点名={named}")
+                      if rc != 1 or not named:
+                          legs.append("  删件输出: " + (proc.stdout + proc.stderr)[:300].replace("\n", " | "))
+                  finally:
+                      # 复原（先于一切判定落盘——工作树必须回到原状）
+                      os.replace(bak_path, tgt_path)
+                      sha_after = sha256_file(tgt_path)
+                  if sha_after != sha_before:
+                      print(f"RED 复原字节校验失守（sha 前={sha_before[:12]}… 后={sha_after[:12]}…）"
+                            f"——工作树被破坏，fail-closed 停手")
+                      return 2
+                  legs.append(f"复原校验: sha256={sha_after[:12]}… 逐位一致 ✓")
+
+                  # 腿2·恢复探针：复原后 A-2 必绿
+                  proc = run_checker(checker, args)
+                  rc = proc.returncode
+                  legs.append(f"恢复探针: rc={rc} 期望=0 {'✓ 必绿' if rc == 0 else '✗<<<'}")
+                  if rc != 0:
+                      fails.append("恢复未绿")
+                      legs.append("  恢复输出: " + (proc.stdout + proc.stderr)[:300].replace("\n", " | "))
+
+              print("A-6 变异演练读数（基线绿＋删件红＋恢复绿 三腿）:")
+              for l in legs:
+                  print("  " + l)
+              if fails:
+                  print(f"A-6 演练红: {len(fails)} 腿失守 -> {fails}")
+                  return 1
+              print(f"A-6 演练全绿 exit 0（靶件={target}；MUT 探针只钉名册列名件；基线/删件/恢复三腿全按期望）")
+              return 0
+
+
+          # ---- selftest（演练全腿真绿 + 变异必红并点名；RT-E121） -------------------------
+
+          def build_world(root, files, declared_count, declared_min,
+                          count_key="ITEMS_COUNT", min_key="ITEMS_COUNT_MIN"):
+              import shutil as _sh
+              os.makedirs(os.path.join(root, "dir"), exist_ok=True)
+              for rel, content in sorted(files.items()):
+                  with open(os.path.join(root, "dir", rel), "w", encoding="utf-8") as fh:
+                      fh.write(content)
+              items = sorted(files)
+              lines = ["# 夹具名册", f"#{count_key}={declared_count}", f"#{min_key}={declared_min}"] + items
+              list_path = os.path.join(root, "roster.list")
+              with open(list_path, "w", encoding="utf-8") as fh:
+                  fh.write("\n".join(lines) + "\n")
+              clog = os.path.join(root, "changelog.md")
+              sha = hashlib.sha256(open(list_path, "rb").read()).hexdigest()
+              with open(clog, "w", encoding="utf-8") as fh:
+                  fh.write(f"| 2026-11-07 | 夹具 | 登记串：roster.list sha256={sha} |\n")
+              return {"checker": "", "list": list_path, "root": os.path.join(root, "dir"),
+                      "count_key": count_key, "min_key": min_key, "floor": "",
+                      "changelog": clog, "counted_cmd": "", "target": "", "require_git": ""}
+
+
+          def do_selftest():
+              import shutil
+              import tempfile
+              tmp = tempfile.mkdtemp(prefix="g3mut-")
+              self_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+              readings, fails = [], []
+              checker = os.path.join(self_dir, "g3_roster_check.py")
+              files = {"alpha.txt": "alpha\n", "beta.txt": "beta\n"}
+
+              def case(name, args, expect_rc, marker, mutate=None):
+                  if mutate:
+                      mutate(args)
+                  argv = [sys.executable, "-I", os.path.abspath(sys.argv[0]), "drill",
+                          "--checker", args["checker"], "--list", args["list"],
+                          "--root", args["root"], "--count-key", args["count_key"],
+                          "--min-key", args["min_key"], "--floor", args["floor"]]
+                  if args.get("changelog"):
+                      argv += ["--changelog", args["changelog"]]
+                  if args.get("target"):
+                      argv += ["--target", args["target"]]
+                  proc = subprocess.run(argv, capture_output=True, text=True)
+                  ok = proc.returncode == expect_rc and (marker in proc.stdout or marker in proc.stderr)
+                  readings.append(f"{name}: rc={proc.returncode} 期望={expect_rc} 点名「{marker}」"
+                                  f"{' ✓' if ok else ' ✗<<<'}")
+                  if not ok:
+                      fails.append(name)
+                      readings.append("  输出: " + (proc.stdout + proc.stderr)[:500].replace("\n", " | "))
+
+              # 真绿1：演练全腿（基线绿＋删件必红＋恢复必绿——卡面夹具核心双腿）
+              a = build_world(os.path.join(tmp, "t-drill"), files, 2, 2)
+              a["checker"] = checker
+              case("真绿·演练全腿（基线绿＋删件红＋恢复绿）", a, 0, "三腿全按期望")
+
+              # 真绿2：显式靶面（--target 名册列名件 beta.txt）
+              a = build_world(os.path.join(tmp, "t-target"), files, 2, 2)
+              a["checker"] = checker
+              a["target"] = "beta.txt"
+              case("真绿·显式靶面（--target=列名件 beta.txt）", a, 0, "三腿全按期望")
+
+              # 真红1：探针越权（--target 非名册列名件——MUT 禁钉任意件）
+              a = build_world(os.path.join(tmp, "t-outsider"), files, 2, 2)
+              a["checker"] = checker
+              with open(os.path.join(a["root"], "outsider.txt"), "w", encoding="utf-8") as fh:
+                  fh.write("not in roster\n")
+              a["target"] = "outsider.txt"
+              case("真红·探针越权（--target 非名册列名件）", a, 1, "探针越权")
+
+              # 真红2：基线误红（声明失真世界——基线腿必抓）
+              a = build_world(os.path.join(tmp, "t-baseworld"), files, 3, 2)
+              a["checker"] = checker
+              case("真红·基线误红（声明失真世界基线腿必抓）", a, 1, "基线误红")
+
+              # 真红3：判别机缺席（--checker 路径不存在=环境错 fail-closed）
+              a = build_world(os.path.join(tmp, "t-nochecker"), files, 2, 2)
+              a["checker"] = os.path.join(tmp, "no-such-checker.py")
+              case("真红·判别机缺席（--checker 缺=fail-closed）", a, 2, "判别机缺席")
+
+              shutil.rmtree(tmp, ignore_errors=True)
+              print("—— A-6 selftest 夹具读数（删件红/恢复绿＋越权红）——")
+              for r in readings:
+                  print("  " + r)
+              if fails:
+                  print(f"A-6 selftest 红: {len(fails)} 夹具失守 -> {fails}")
+                  return 1
+              print("A-6 selftest 全绿 exit 0（真绿 2 必绿＋变异 3 必红且点名；与 A-2 判别机同批在证）")
+              return 0
+
+
+          def main(argv):
+              if len(argv) >= 2 and argv[1] == "selftest":
+                  return do_selftest()
+              if len(argv) >= 2 and argv[1] == "drill":
+                  args = {"checker": "", "list": "", "root": "", "count_key": "", "min_key": "",
+                          "floor": "", "changelog": "", "counted_cmd": "", "target": "", "require_git": ""}
+                  i = 2
+                  while i < len(argv):
+                      key = argv[i].lstrip("-").replace("-", "_")
+                      if key == "require_git":
+                          args["require_git"] = "1"
+                          i += 1
+                          continue
+                      if key in args and i + 1 < len(argv):
+                          args[key] = argv[i + 1]
+                          i += 2
+                      else:
+                          print(f"usage 错: {argv[i]}", file=sys.stderr)
+                          return 2
+                  for k in ("checker", "list", "root", "count_key", "min_key"):
+                      if not args[k]:
+                          print(f"usage 错: --{k.replace('_','-')} 必填（缺参=不可判，fail-closed）",
+                                file=sys.stderr)
+                          return 2
+                  return do_drill(args)
+              print("usage: g3_mutation_drill.py drill --checker P --list F --root D --count-key K "
+                    "--min-key M [--floor N] [--changelog C] [--counted-cmd CMD] [--target NAME] "
+                    "[--require-git] | selftest", file=sys.stderr)
+              return 2
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          G3_DRILL_PY
+          python3 -I "$G2DIR/g3_mutation_drill.py" selftest
+      - name: "批3·A-6 步2·调用仓面（对实名册列名件删-验-还；越权/假绿/误红一律红）"
+        if: ${{ inputs.g2_scope != 'fixtures-only' }}
+        run: |
+          set -eu
+          # 检出面（可复用件跑在调用方工作区；匿名 clone 零 uses 形态）
+          if [ -n "$CI_G2_CHECKOUT_URL" ]; then
+            REF="${CI_G2_CHECKOUT_REF:-}"
+            attempt=0
+            until [ "$attempt" -ge 3 ]; do
+              if [ -n "$(ls -A . 2>/dev/null)" ]; then
+                find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+              fi
+              CLONE_OK=0
+              if printf '%s' "$REF" | grep -qE '^[0-9a-f]{40}$'; then
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then
+                  if git fetch --depth 1 origin "$REF" && git checkout --quiet --detach "$REF"; then
+                    CLONE_OK=1
+                  fi
+                fi
+              elif [ -n "$REF" ]; then
+                if git clone --depth 1 --branch "$REF" -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              else
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              fi
+              if [ "$CLONE_OK" = 1 ]; then break; fi
+              attempt=$((attempt + 1))
+              echo "批2 检出失败（第 $attempt/3 次）——5s 后重试" >&2
+              sleep 5
+            done
+            if [ "$attempt" -ge 3 ]; then
+              echo "RED 批2 检出面三次皆败（直连抖动/私仓未带凭据面）——fail-closed" >&2
+              exit 2
+            fi
+          elif [ -z "$(ls -A . 2>/dev/null)" ]; then
+            echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
+            exit 2
+          fi
+
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G3_* 同名；
+          # 只填显式入参留空的键——显式入参优先。每作业独立装配（D-89 补丁2 形制））
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G3K in CI_G3_ROSTER_LIST CI_G3_ROSTER_ROOT CI_G3_COUNT_KEY CI_G3_MIN_KEY CI_G3_COUNT_MIN CI_G3_CHANGELOG CI_G3_COUNTED_CMD CI_G3_MUT_TARGET; do
+              G3CUR="$(eval "printf '%s' \"\${$G3K:-}\"")"
+              [ -n "$G3CUR" ] && continue
+              G3V="$(grep -m1 "^$G3K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G3V" ] && eval "export $G3K=\"$G3V\""
+            done
+            echo "批3 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
+          fi
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g3/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          [ -f "$G2DIR/g3_roster_check.py" ] || { echo "RED 判别机缺席（步1 未落 G2DIR=$G2DIR）——fail-closed" >&2; exit 2; }
+          [ -f "$G2DIR/g3_mutation_drill.py" ] || { echo "RED 演练机缺席（步1 未落 G2DIR=$G2DIR）——fail-closed" >&2; exit 2; }
+          if [ -z "${CI_G3_ROSTER_LIST:-}" ] || [ -z "${CI_G3_ROSTER_ROOT:-}" ]; then
+            echo "RED 缺参（roster_list/roster_root 必填）——不可判 fail-closed" >&2
+            exit 2
+          fi
+          EXTRA_ARGS=()
+          if [ -n "${CI_G3_COUNT_MIN:-}" ]; then EXTRA_ARGS+=(--floor "$CI_G3_COUNT_MIN"); fi
+          if [ -n "${CI_G3_CHANGELOG:-}" ]; then EXTRA_ARGS+=(--changelog "$CI_G3_CHANGELOG"); fi
+          if [ -n "${CI_G3_COUNTED_CMD:-}" ]; then EXTRA_ARGS+=(--counted-cmd "$CI_G3_COUNTED_CMD"); fi
+          if [ -n "${CI_G3_MUT_TARGET:-}" ]; then EXTRA_ARGS+=(--target "$CI_G3_MUT_TARGET"); fi
+          echo "批3·A-6 步2: 调用仓实名册删-验-还演练（名册=$CI_G3_ROSTER_LIST 根=$CI_G3_ROSTER_ROOT）"
+          python3 -I "$G2DIR/g3_mutation_drill.py" drill \
+            --checker "$G2DIR/g3_roster_check.py" \
+            --list "$CI_G3_ROSTER_LIST" --root "$CI_G3_ROSTER_ROOT" \
+            --count-key "${CI_G3_COUNT_KEY:-ITEMS_COUNT}" --min-key "${CI_G3_MIN_KEY:-ITEMS_COUNT_MIN}" \
+            --require-git ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
