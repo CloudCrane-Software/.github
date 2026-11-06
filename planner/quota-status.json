@@ -1,0 +1,45 @@
+{
+  "schema": "af.model-quota-hold.v2",
+  "source": "状态/模型配额停用-20261105.json（2026-11-06 09:25 版）实读提炼",
+  "updated_at": "2026-11-06T17:36:12+0800",
+  "hold_until": "2026-11-06T18:00:00+0800",
+  "calls_this_hour": 0,
+  "priority": [
+    {
+      "rank": 1,
+      "provider_id": "new-provider",
+      "model_id": "step-5-preview",
+      "note": "唯一主通道（minimax 周额度清零后）；key 2026-12-05 20:00 过期前持续用。"
+    },
+    {
+      "rank": 2,
+      "provider_id": "x-ai",
+      "model_id": "grok-4.6",
+      "note": "anolis 兜底。"
+    },
+    {
+      "rank": 3,
+      "provider_id": "(运营者支援)",
+      "model_id": "(别的 plan 额度)",
+      "note": "动用前必须明确说。"
+    }
+  ],
+  "banned": {
+    "providers": [
+      "account:bigmodel-individual-coding-plan",
+      "account:bigmodel-offpeak-idle-plan",
+      "account:bigmodel-highspeed-card",
+      "account:minimax-token-plan"
+    ],
+    "model_ids": [
+      "GLM-5.3",
+      "GLM-5.3-Flash",
+      "MiniMax-M3.1-Flash"
+    ],
+    "note": "GLM 全账户停用至 2026-11-06 18:00；start-plan 免费窗 2026-11-06 09:00 EXPIRED；minimax 周额度 EXHAUSTED（禁用至周额度重置，重置时点待运营者告）。"
+  },
+  "refresh": {
+    "status": "pending-card",
+    "note": "本件为治理副本：本地 cron 定时从 状态/模型配额停用-*.json 刷新为后续卡——P4 落地本次只落初值。"
+  }
+}
