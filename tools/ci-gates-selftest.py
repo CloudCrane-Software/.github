@@ -252,6 +252,141 @@ MUTATIONS = (
 )
 
 
+# ============================================================================
+# 第二批自检段（.github#16 / D-89 / w06-org-gates-batch2）——四门点选形制机判
+#   pin-check（A-5 全集钉对账）/ budget-adaptive（A-15 机制）/ workflow-hygiene
+#   （A-22 F1 面作用域）/ secure-lint（A-17 四规则只报不加）。
+#   本段只增不改第一批断言/变异语义（判据件零改动；allowed_paths=第二批自检段）。
+# ============================================================================
+
+# 被禁常量以拼接构造（同 ABSORB_* 纪律：卡面五枚校准常量禁钉进 org 件，
+# 验收命令集 4 grep 零命中；数值不落本段一字面）
+G2_CONSTANTS = ("179" + "86", "25" + "125", "24" + "00", "15" + "00", "16" + "00")
+
+G2_JOBS = (
+    ("pin-check", "pin_check_enable"),
+    ("budget-adaptive", "budget_enable"),
+    ("workflow-hygiene", "hygiene_enable"),
+    ("secure-lint", "secure_lint_enable"),
+)
+
+
+def _job_block(text, job):
+    """取 2 缩进作业块（自 `  <job>:` 行起，至下一个 2 缩进非注释键行或文末）。"""
+    lines = text.splitlines()
+    start = None
+    for i, raw in enumerate(lines):
+        if raw == "  " + job + ":":
+            start = i
+            break
+    if start is None:
+        return None
+    j = start + 1
+    while j < len(lines):
+        raw = lines[j]
+        if raw.strip() and not raw.lstrip().startswith("#"):
+            if len(raw) - len(raw.lstrip()) <= 2:
+                break
+        j += 1
+    return "\n".join(lines[start:j])
+
+
+def g2_violations(text):
+    """第二批基线机判：返回违规列表（空=绿）。"""
+    vs = []
+    # 1) 四门作业在位且形制齐备（点选卫/runner 点选/超时止损/双步/调用步批次卫）
+    for job, enable in G2_JOBS:
+        block = _job_block(text, job)
+        if block is None:
+            vs.append(f"批2作业缺席:{job}")
+            continue
+        if "if:" not in block or f"inputs.{enable} == 'true'" not in block:
+            vs.append(f"批2点选卫缺席:{job}（inputs.{enable} 卫不在——无条件跑=非点选形制）")
+        if "inputs.g2_runs_on" not in block:
+            vs.append(f"批2 runner 点选缺席:{job}（inputs.g2_runs_on）")
+        if "timeout-minutes: 45" not in block:
+            vs.append(f"批2超时止损缺席:{job}（timeout-minutes: 45）")
+        if "判别力自证" not in block:
+            vs.append(f"批2判别力自证步缺席:{job}（夹具真红必红/真绿必绿=验收面）")
+        if "调用仓面" not in block:
+            vs.append(f"批2调用仓面步缺席:{job}")
+        if "inputs.g2_scope != 'fixtures-only'" not in block:
+            vs.append(f"批2调用步批次卫缺席:{job}（fixtures-only 试跑域）")
+    # 2) g2 通用 inputs 在位（workflow_call 与 workflow_dispatch 双登记）
+    for name in ("g2_scope", "g2_runs_on", "g2_checkout_url", "g2_checkout_ref"):
+        if text.count(name + ":") < 2:
+            vs.append(f"批2入参登记不全:{name}（call/dispatch 双面各一）")
+    for _job, enable in G2_JOBS:
+        if text.count(enable + ":") < 2:
+            vs.append(f"批2点选入参登记不全:{enable}（call/dispatch 双面各一）")
+    # 3) 第一批 org-gates 作业带批次卫（默认 caller=与第一批逐字一致，卫只增不减）
+    if "inputs.g2_scope == 'caller'" not in text:
+        vs.append("批1作业批次卫缺席:org-gates（inputs.g2_scope == 'caller'）")
+    # 4) workflow_dispatch 试跑面在位（验收命令集 2 dispatch 回读）
+    if "workflow_dispatch:" not in text:
+        vs.append("批2 dispatch 试跑面缺席:workflow_dispatch")
+    # 5) 常量零迁移（卡面五枚校准常量，拼接种逐枚全文扫）
+    for c in G2_CONSTANTS:
+        if c in text:
+            vs.append("校准常量在场:" + c + "（禁项：校准常量禁钉进 org 件）")
+    return vs
+
+
+def mut_drop_job_secure_lint(text):
+    lines = text.splitlines()
+    start = None
+    for i, raw in enumerate(lines):
+        if raw == "  secure-lint:":
+            start = i
+            break
+    if start is None:
+        raise AssertionError("M6 锚点未命中——自检件与工作流件结构漂移，先修自检件")
+    j = start + 1
+    while j < len(lines):
+        raw = lines[j]
+        if raw.strip() and len(raw) - len(raw.lstrip()) <= 2 and not raw.lstrip().startswith("#"):
+            break
+        j += 1
+    return "\n".join(lines[:start] + lines[j:]) + "\n"
+
+
+def mut_inject_constant(text):
+    anchor = 'python3 -I "$G2DIR/g2_secure_lint.py" selftest'
+    if anchor not in text:
+        raise AssertionError("M7 锚点未命中——自检件与工作流件结构漂移，先修自检件")
+    injected = anchor + '\n          echo "calibration baseline ' + "24" + "00" + 's（校准常量越境注入——必红）"'
+    return text.replace(anchor, injected, 1)
+
+
+def mut_drop_enable_guard(text):
+    lines = text.splitlines()
+    out, removed = [], False
+    for raw in lines:
+        if not removed and "inputs.secure_lint_enable == 'true'" in raw:
+            removed = True
+            continue
+        out.append(raw)
+    if not removed:
+        raise AssertionError("M8 锚点未命中——自检件与工作流件结构漂移，先修自检件")
+    return "\n".join(out) + "\n"
+
+
+def mut_widen_timeout(text):
+    pos = text.index("  pin-check:")
+    head, tail = text[:pos], text[pos:]
+    if "timeout-minutes: 45" not in tail:
+        raise AssertionError("M9 锚点未命中——自检件与工作流件结构漂移，先修自检件")
+    return head + tail.replace("timeout-minutes: 45", "timeout-minutes: 90", 1)
+
+
+G2_MUTATIONS = (
+    ("M6 删批2作业(secure-lint)", mut_drop_job_secure_lint, "批2作业缺席:secure-lint"),
+    ("M7 插校准常量(2400s)", mut_inject_constant, "校准常量"),
+    ("M8 摘批2点选卫", mut_drop_enable_guard, "批2点选卫缺席:secure-lint"),
+    ("M9 批2超时放宽(45→90)", mut_widen_timeout, "timeout-minutes"),
+)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="ci-gates-selftest.py",
@@ -293,8 +428,43 @@ def main(argv=None):
         else:
             mut_reports.append(f"{name}: 必红 ✓ 点名「{named[0]}」")
 
+    # —— 第二批基线（D-89 四门点选形制）——
+    g2_vs = g2_violations(text)
+    if g2_vs:
+        fails.append(("批2基线", g2_vs))
+        for v in g2_vs:
+            print("批2基线红: " + v)
+    else:
+        print("批2基线绿（四门作业在位：点选卫+runner 点选+超时止损+双步+批次卫；"
+              "g2 入参 call/dispatch 双登记；批1 org-gates 批次卫；dispatch 试跑面；"
+              "校准常量零命中）")
+
+    g2_mut_reports = []
+    for name, fn, marker in G2_MUTATIONS:
+        try:
+            mut_text = fn(text)
+        except AssertionError as exc:
+            fails.append((name, [str(exc)]))
+            g2_mut_reports.append(f"{name}: 变异器自坏——{exc}")
+            continue
+        vs1, _ = violations(mut_text)
+        vs2 = g2_violations(mut_text)
+        vs = vs1 + vs2
+        named = [v for v in vs if marker in v]
+        if not vs:
+            g2_mut_reports.append(f"{name}: 未红（零违规）——负控失守")
+            fails.append((name, ["变异后零违规——负控失守"]))
+        elif not named:
+            g2_mut_reports.append(f"{name}: 红但未点名（violations={vs}）")
+            fails.append((name, [f"变异后红但未点名期望标记 {marker!r}: {vs}"]))
+        else:
+            g2_mut_reports.append(f"{name}: 必红 ✓ 点名「{named[0]}」")
+
     print("—— 变异负控（A-7 自体应用：删它必须红）——")
     for r in mut_reports:
+        print("  " + r)
+    print("—— 第二批变异负控（D-89：删它必须红）——")
+    for r in g2_mut_reports:
         print("  " + r)
     if fails:
         print(f"selftest: 红 → exit 1（违例组 {len(fails)}）")
@@ -302,7 +472,8 @@ def main(argv=None):
             for v in vs:
                 print(f"  [{name}] " + v)
         return 1
-    print(f"selftest: 全绿 exit 0（基线绿 + {len(MUTATIONS)} 变异全红且点名；解析={method}）")
+    print(f"selftest: 全绿 exit 0（批1基线绿 + {len(MUTATIONS)} 变异全红且点名；"
+          f"批2基线绿 + {len(G2_MUTATIONS)} 变异全红且点名；解析={method}）")
     return 0
 
 
