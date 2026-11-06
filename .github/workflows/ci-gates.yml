@@ -1,0 +1,531 @@
+# =============================================================================
+# ci-gates.yml — CloudCrane-Software/.github 组织级可复用 CI 门（第一批六门）
+#
+# 卡面: factory-os issue #8（w04-org-ci-gates-firstbatch / D-75 / L-01）。
+# 判据正本: 30-工件/CI流水线研究-20261106/Q1-门机制分级.md §2.1 表
+#   （A-1 :148 / A-3 :150 / A-4 :151 / A-7 :154 / A-8 :155 / A-9 :156）
+#   与 §五.1「最应先组织化六项」——「清单+钉值+退出码」形态，无仓专属假设。
+# 本件与既有 gates.yml / ci.yml / ci-python.yml / eval-gate.yml 并列，只新建零覆盖。
+#
+# 六门 fail-closed 语义与逃逸问题来源（编号=Q1 行号；来源=Q1 §2.1 判定理由列）:
+#   A-1(:148) 非零即红；rc=2/缺件/自退不计 SKIP；SKIP 必带原因且声明对账人
+#     逃逸源: 模式② 自退吞红；RT-E120 rc 捕获失效叠加恒 0（all-gates.sh:1316-1327）
+#   A-3(:150) 门本体/判据源 sha256 外置钉桩+双消费面对账；失配即红不执行；钉桩不可读 fail-closed
+#     逃逸源: RT-E151/E228 钉桩逐代漂移十次（deploy-consistency-probe.sh:125）
+#   A-4(:151) 登记↔执行双向绑定，两个方向都红
+#     逃逸源: RT-E48 摘门保牌（逃逸问题台账.md:403，删调用行留登记行即红）
+#   A-7(:154) 门判别力负向自测：探针必红→门必记 FAIL，附绿路对照
+#     逃逸源: 模式⑱ 门退化成真空门（l5/l6-deploy-gate-selftest.sh 先例）
+#   A-8(:155) 真空求值防护：判定记录数=0 记 VACUOUS 不计 PASS；覆盖不全不得计绿
+#     逃逸源: 模式⑦ 检查存在且绿但测不到目的（otlp-assert.py:45-46/:663-685 先例）
+#   A-9(:156) 死手断言：读数过期/不可证 rc=2 不猜绿
+#     逃逸源: 模式⑮ 停摆全部读绿（all-gates.sh:936-937 先例）
+#
+# 形态纪律（A-22 口径=af/ci/gh_workflow_check.py:12-40 R01–R22，判据面本体本卡零改动）:
+#   零外部 action（R07，全文零 uses:）/权限只读（R05）/超时止损 ≤45（R12）/
+#   顶层 concurrency（R13）/禁提权触发（R03）/禁吞红写法（R21）/
+#   零 secret 引用（卡面禁项）；checkout 由调用方先做（可复用件跑在调用方工作区）。
+#   静态自检面=同仓 tools/ci-gates-selftest.py（本地可机判，不依赖 Actions 执行面）。
+#
+# 调用契约:
+#   uses: CloudCrane-Software/.github/.github/workflows/ci-gates.yml@main
+#   入参（均 string）:
+#     manifest           被测件清单路径（登记槽）。行格式: gate_id|command|surface_path?
+#                        （竖线分隔，# 注释；command 可引用下方 CI_GATES_* 环境变量）
+#     pins               钉桩面路径（A-3）。行格式: path|sha256（# 注释；钉门本体与判据源；
+#                        缺席/不可读/失配一律红且后续执行槽不执行）
+#     criteria_dir       判据目录（判据源根；缺席即红；经 CI_GATES_CRITERIA_DIR 供门取用）
+#     fresh_max_seconds  A-9 读数新鲜度上限秒（默认 86400；读数面 mtime 距今超限即红）
+#   门 stdout 契约: RECORDS=<n> 判定记录数自报（单行；多行=契约违反→A-8 复点红；
+#     缺省=0→VACUOUS 不计 PASS）；
+#     「SKIP=<原因> owner=<对账人>」单行双要素为合规 SKIP，缺 owner=BARE_SKIP 红。
+# =============================================================================
+name: ci-gates
+
+on:
+  workflow_call:
+    inputs:
+      manifest:
+        description: "被测件清单路径（登记槽；gate_id|command|surface_path?，# 注释）"
+        required: false
+        default: "tools/ci-gates-manifest.list"
+        type: string
+      pins:
+        description: "钉桩面路径（A-3；path|sha256，# 注释；缺席/失配即红不执行）"
+        required: false
+        default: "tools/ci-gates-pins.list"
+        type: string
+      criteria_dir:
+        description: "判据目录（判据源根；缺席即红；经 CI_GATES_CRITERIA_DIR 供门取用）"
+        required: false
+        default: "tools/ci-gates-criteria"
+        type: string
+      fresh_max_seconds:
+        description: "A-9 读数新鲜度上限秒（默认 86400）"
+        required: false
+        default: "86400"
+        type: string
+
+# 权限最小化（R05/A-22）：全链只读。
+permissions:
+  contents: read
+
+# 并发策略（R13）：同一 ref 重复推送只保最新一次验收。
+concurrency:
+  group: ci-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  org-gates:
+    name: org-ci-gates（第一批六门 fail-closed）
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI_GATES_MANIFEST: ${{ inputs.manifest }}
+      CI_GATES_PINS: ${{ inputs.pins }}
+      CI_GATES_CRITERIA_DIR: ${{ inputs.criteria_dir }}
+      CI_GATES_FRESH_MAX_SECONDS: ${{ inputs.fresh_max_seconds }}
+    steps:
+      # ---- 门0：运行器铸造 ----------------------------------------------------
+      # 单一运行器供六门共用（A-1 执行槽/A-7 判别力自测跑同一份代码，杜绝双实现漂移）。
+      - name: "门0 · 运行器铸造（ci-gates-runner，六门共用判别机）"
+        run: |
+          set -eu
+          echo "门0: 运行器铸造（A-1/A-8/A-9 语义一次成型于 runner，六门步独立复核）"
+          mkdir -p .ci-gates-out
+          cat > .ci-gates-out/runner.py <<'RUNNER_PY'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          """ci-gates runner（由 ci-gates.yml 门0 铸造；卡面 factory-os#8）。
+
+          契约:
+            清单行: gate_id|command|surface_path?（竖线分隔；# 注释；gate_id 不得重复）
+            门 stdout: RECORDS=<n> 判定记录数自报（A-8；缺省按 0→VACUOUS 不计 PASS）；
+              「SKIP=<原因> owner=<对账人>」合规 SKIP（A-1；缺 owner=BARE_SKIP）。
+          verdict（A-1 非零即红 / A-8 真空 / A-9 死手，一次成型；下游门步独立复核）:
+            rc=2→DEADHAND（不可证不猜绿）；rc=124→FAIL_TIMEOUT；rc=0 且合规 SKIP→SKIP；
+            rc=0 且无 SKIP: records>=1→PASS，records=0→VACUOUS；rc=0 且裸 SKIP→BARE_SKIP；
+            其余非零→FAIL。任何非零 rc 一律不判 SKIP（自退不计 SKIP）。
+          产物: <outdir>/judgments.jsonl（逐门判定记录，含 epoch/surface_ts 供 A-9）
+                <outdir>/executed.log（执行槽名册，供 A-4 双向绑定）
+          harness 退出码: 0=在册门全部执行完毕（门红与否由下游判）；2=清单缺席/行不可
+            解析/重复登记（不可证，fail-closed）。
+          """
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          import time
+
+          RECORDS_RE = re.compile(r"^RECORDS=(\d+)\s*$", re.M)
+          SKIP_RE = re.compile(r"^SKIP=(.+?)(?:\s+owner=(\S+))?\s*$", re.M)
+          GATE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+          def main(argv):
+              if len(argv) != 3:
+                  print("usage: runner.py <manifest> <outdir>", file=sys.stderr)
+                  return 2
+              manifest_path, outdir = argv[1], argv[2]
+              if not os.path.isfile(manifest_path):
+                  print(f"runner: 清单缺席 {manifest_path} —— fail-closed 不可证",
+                        file=sys.stderr)
+                  return 2
+              os.makedirs(outdir, exist_ok=True)
+              entries, seen, errors = [], set(), []
+              with open(manifest_path, encoding="utf-8") as fh:
+                  for lineno, raw in enumerate(fh, 1):
+                      line = raw.strip()
+                      if not line or line.startswith("#"):
+                          continue
+                      parts = [p.strip() for p in line.split("|")]
+                      if len(parts) < 2 or not parts[0] or not parts[1]:
+                          errors.append(f"L{lineno} 行不可解析: {raw.rstrip()}")
+                          continue
+                      gid = parts[0]
+                      if not GATE_ID_RE.match(gid):
+                          errors.append(f"L{lineno} gate_id 非法: {gid}")
+                          continue
+                      if gid in seen:
+                          errors.append(f"L{lineno} 重复登记: {gid}")
+                          continue
+                      seen.add(gid)
+                      surface = parts[2] if len(parts) > 2 and parts[2] else None
+                      entries.append((gid, parts[1], surface))
+              if errors:
+                  for e in errors:
+                      print("runner: " + e, file=sys.stderr)
+                  return 2
+              jf = open(os.path.join(outdir, "judgments.jsonl"), "w", encoding="utf-8")
+              ef = open(os.path.join(outdir, "executed.log"), "w", encoding="utf-8")
+              for gid, command, surface in entries:
+                  rec = {"gate_id": gid, "command": command, "surface_path": surface}
+                  try:
+                      proc = subprocess.run(
+                          ["bash", "-o", "pipefail", "-c", command],
+                          capture_output=True, text=True, timeout=300)
+                      rc, out, err = proc.returncode, proc.stdout or "", (proc.stderr or "")[-400:]
+                  except subprocess.TimeoutExpired:
+                      rc, out, err = 124, "", "timeout 300s"
+                  rec["epoch"] = int(time.time())
+                  rec["rc"] = rc
+                  recs = RECORDS_RE.findall(out)
+                  rec["records"] = int(recs[-1]) if recs else 0
+                  rec["records_lines"] = [m.group(0).strip() for m in RECORDS_RE.finditer(out)]
+                  if surface:
+                      try:
+                          rec["surface_ts"] = int(os.stat(surface).st_mtime)
+                      except OSError:
+                          rec["surface_ts"] = None
+                  else:
+                      rec["surface_ts"] = None
+                  sm = SKIP_RE.search(out)
+                  if rc == 2:
+                      verdict = "DEADHAND"
+                  elif rc == 124:
+                      verdict = "FAIL_TIMEOUT"
+                  elif rc == 0:
+                      if sm is not None:
+                          if sm.group(2):
+                              verdict = "SKIP"
+                              rec["skip_reason"] = sm.group(1).strip()
+                              rec["skip_owner"] = sm.group(2)
+                          else:
+                              verdict = "BARE_SKIP"
+                              rec["skip_reason"] = sm.group(1).strip()
+                      elif rec["records"] >= 1:
+                          verdict = "PASS"
+                      else:
+                          verdict = "VACUOUS"
+                  else:
+                      verdict = "FAIL"
+                  rec["verdict"] = verdict
+                  rec["stderr_tail"] = err
+                  jf.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                  ef.write(gid + "\n")
+                  print(f"runner: {gid} rc={rc} records={rec['records']} verdict={verdict}")
+              jf.close()
+              ef.close()
+              return 0
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          RUNNER_PY
+          rc_probe=0
+          python3 -I .ci-gates-out/runner.py >/dev/null 2>&1 || rc_probe=$?
+          if [ "$rc_probe" -ne 2 ]; then
+            echo "门0: 运行器用法探针 rc=$rc_probe ≠ 2 —— 判别机自坏，fail-closed" >&2
+            exit 1
+          fi
+          echo "门0: 运行器在位（用法探针 rc=2，判别机可判）"
+
+      # ---- 门1 · A-3：钉桩对账（双消费面） -------------------------------------
+      # Q1-门机制分级.md:150。失配即红不执行：本步红 ⇒ 门2 执行槽被步骤短路不执行；
+      # 下游恒跑门步对「判定面缺席」各自补红（fail-closed 不放行）。
+      # 双消费面 = 两个独立读取实现（python-hashlib 面 P × coreutils-sha256sum 面 S）
+      # 与钉值正本三方等价；钉桩不可读/行不可解析/钉值非法/对象缺席一律红。
+      - name: "门1 · A-3 门本体/判据源 sha256 外置钉桩+双消费面对账（失配即红不执行）"
+        run: |
+          set -eu
+          echo "门1/A-3: 钉桩对账（正本 × P 面 × S 面）"
+          [ -f "$CI_GATES_PINS" ] || { echo "门1/A-3: 钉桩面缺席 $CI_GATES_PINS —— fail-closed（钉桩不可读不执行）" >&2; exit 1; }
+          [ -d "$CI_GATES_CRITERIA_DIR" ] || { echo "门1/A-3: 判据目录缺席 $CI_GATES_CRITERIA_DIR —— fail-closed" >&2; exit 1; }
+          mkdir -p .ci-gates-out
+          python3 -I - "$CI_GATES_PINS" <<'FACE_P_PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import sys
+          entries, errors = [], []
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              for lineno, raw in enumerate(fh, 1):
+                  line = raw.strip()
+                  if not line or line.startswith("#"):
+                      continue
+                  parts = [p.strip() for p in line.split("|")]
+                  if len(parts) != 2 or not parts[0] or not parts[1]:
+                      errors.append(f"L{lineno} 行不可解析: {raw.rstrip()}")
+                      continue
+                  path, expected = parts
+                  if not re.fullmatch(r"[0-9a-f]{64}", expected):
+                      errors.append(f"L{lineno} 钉值非 sha256 十六进制: {path}")
+                      continue
+                  actual = None
+                  if os.path.isfile(path):
+                      h = hashlib.sha256()
+                      with open(path, "rb") as g:
+                          for chunk in iter(lambda: g.read(1 << 20), b""):
+                              h.update(chunk)
+                      actual = h.hexdigest()
+                  entries.append({"path": path, "expected": expected, "actual": actual})
+          with open(".ci-gates-out/face-p.json", "w", encoding="utf-8") as out:
+              json.dump({"entries": entries, "errors": errors}, out, ensure_ascii=False)
+          FACE_P_PY
+          while IFS='|' read -r pin_path pin_expected; do
+            case "$pin_path" in '#'*) continue ;; esac
+            [ -n "$pin_path" ] || continue
+            if [ -f "$pin_path" ]; then
+              pin_actual=$(sha256sum -- "$pin_path" | cut -d' ' -f1)
+            else
+              pin_actual=MISSING
+            fi
+            printf '%s|%s|%s\n' "$pin_path" "$pin_expected" "$pin_actual"
+          done < "$CI_GATES_PINS" > .ci-gates-out/face-s.txt
+          python3 -I - "$CI_GATES_PINS" .ci-gates-out/face-p.json .ci-gates-out/face-s.txt <<'RECON_PY'
+          import json
+          import re
+          import sys
+          def parse_pins(path):
+              out, errs = {}, []
+              with open(path, encoding="utf-8") as fh:
+                  for i, raw in enumerate(fh, 1):
+                      line = raw.strip()
+                      if not line or line.startswith("#"):
+                          continue
+                      parts = [p.strip() for p in line.split("|")]
+                      if len(parts) != 2 or not parts[0] or not parts[1] or not re.fullmatch(r"[0-9a-f]{64}", parts[1]):
+                          errs.append(f"L{i} 不可解析: {raw.rstrip()}")
+                          continue
+                      out[parts[0]] = parts[1]
+              return out, errs
+          pins, perr = parse_pins(sys.argv[1])
+          faced = json.load(open(sys.argv[2], encoding="utf-8"))
+          facep = {e["path"]: (e["expected"], e["actual"]) for e in faced["entries"]}
+          faces = {}
+          with open(sys.argv[3], encoding="utf-8") as fh:
+              for raw in fh:
+                  p, e, a = raw.rstrip("\n").split("|")
+                  faces[p] = (e, a)
+          bad = list(perr) + list(faced["errors"])
+          for name, d in (("P", facep), ("S", faces)):
+              for p in sorted(set(d) - set(pins)):
+                  bad.append(f"面{name}多钉（两消费面覆盖失配）: {p}")
+              for p in sorted(set(pins) - set(d)):
+                  bad.append(f"面{name}漏钉（两消费面覆盖失配）: {p}")
+          for path, expected in sorted(pins.items()):
+              for name, d in (("P", facep), ("S", faces)):
+                  if path not in d:
+                      continue
+                  e, a = d[path]
+                  if e != expected:
+                      bad.append(f"面{name}钉值与正本失配: {path}")
+                  if a in ("MISSING", None):
+                      bad.append(f"钉桩对象缺席（fail-closed）: {path}")
+                  elif a != expected:
+                      bad.append(f"改门/改判据未重锚（面{name}）: {path}")
+          if bad:
+              print("门1/A-3 钉桩对账红（失配即红不执行）:")
+              for b in bad:
+                  print("  RED " + b)
+              sys.exit(1)
+          print(f"门1/A-3: {len(pins)} 件钉桩三方一致（正本=P面=S面），判据目录在场——放行执行")
+          RECON_PY
+
+      # ---- 门2 · A-1：退出码语义执行槽 -----------------------------------------
+      # Q1-门机制分级.md:148。非零即红（FAIL/DEADHAND/VACUOUS/BARE_SKIP/FAIL_TIMEOUT
+      # 一律红）；rc=2/缺件/自退不计 SKIP；合规 SKIP 必带原因+对账人；一次收全诊断。
+      - name: "门2 · A-1 fail-closed 退出码语义执行（非零即红；rc=2/自退不计 SKIP；裸 SKIP 即红）"
+        run: |
+          set -eu
+          echo "门2/A-1: 执行槽（清单=$CI_GATES_MANIFEST）"
+          [ -f .ci-gates-out/runner.py ] || { echo "门2/A-1: 运行器缺席——门0 未跑，fail-closed" >&2; exit 2; }
+          HARNESS_RC=0
+          python3 -I .ci-gates-out/runner.py "$CI_GATES_MANIFEST" .ci-gates-out || HARNESS_RC=$?
+          if [ "$HARNESS_RC" -ne 0 ]; then
+            echo "门2/A-1: 运行器 harness 错 rc=$HARNESS_RC（清单缺席/行不可解析/重复登记）——不可证即红" >&2
+            exit "$HARNESS_RC"
+          fi
+          python3 -I - .ci-gates-out/judgments.jsonl <<'ASSERT_PY'
+          import json
+          import sys
+          bad = []
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              for line in fh:
+                  r = json.loads(line)
+                  if r["verdict"] not in ("PASS", "SKIP"):
+                      bad.append(f"{r['gate_id']}: verdict={r['verdict']} rc={r['rc']} records={r['records']}")
+          if bad:
+              print("门2/A-1 非零即红（FAIL/DEADHAND/VACUOUS/BARE_SKIP/FAIL_TIMEOUT 全数红）:")
+              for b in bad:
+                  print("  RED " + b)
+              sys.exit(1)
+          print("门2/A-1: 在册门全 PASS 或合规 SKIP（原因+对账人在案）")
+          ASSERT_PY
+
+      # ---- 门3 · A-4：登记↔执行双向绑定 ----------------------------------------
+      # Q1-门机制分级.md:151。两方向都红：登记在册而执行缺席 / 执行在跑而未登记。
+      - name: "门3 · A-4 登记↔执行双向绑定（两方向都红；摘门保牌形态即红）"
+        if: ${{ always() }}
+        run: |
+          set -eu
+          echo "门3/A-4: 双向绑定（登记槽=$CI_GATES_MANIFEST × 执行槽=.ci-gates-out/executed.log）"
+          if [ ! -f .ci-gates-out/executed.log ] || [ ! -f "$CI_GATES_MANIFEST" ]; then
+            echo "门3/A-4: 判定面/执行槽缺席——上游未执行，登记↔执行不可证，fail-closed 红" >&2
+            exit 2
+          fi
+          python3 -I - "$CI_GATES_MANIFEST" .ci-gates-out/executed.log <<'BIND_PY'
+          import sys
+          ids = []
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              for raw in fh:
+                  line = raw.strip()
+                  if not line or line.startswith("#"):
+                      continue
+                  ids.append(line.split("|")[0].strip())
+          with open(sys.argv[2], encoding="utf-8") as fh:
+              executed = [l.strip() for l in fh if l.strip()]
+          reg, exe = set(ids), set(executed)
+          dups = sorted({g for g in ids if ids.count(g) > 1})
+          bad = [f"登记在册而执行缺席: {g}" for g in sorted(reg - exe)]
+          bad += [f"执行在跑而未登记: {g}" for g in sorted(exe - reg)]
+          bad += [f"清单重复登记（绑定歧义）: {g}" for g in dups]
+          if bad:
+              print("门3/A-4 登记↔执行双向绑定红:")
+              for b in bad:
+                  print("  RED " + b)
+              sys.exit(1)
+          print(f"门3/A-4: 登记{len(reg)}≡执行{len(exe)}，双向绑定绿")
+          BIND_PY
+
+      # ---- 门4 · A-7：门判别力负向自测（自体应用） -------------------------------
+      # Q1-门机制分级.md:154。探针必红→判别机必记 FAIL/DEADHAND/VACUOUS/BARE_SKIP；
+      # 绿路对照必 PASS；合规 SKIP 必记 SKIP。判别机放水即本步红。
+      - name: "门4 · A-7 判别力负向自测（探针必红→必记 FAIL；绿路对照必 PASS）"
+        if: ${{ always() }}
+        run: |
+          set -eu
+          echo "门4/A-7: 判别机负向自测（六探针对表）"
+          [ -f .ci-gates-out/runner.py ] || { echo "门4/A-7: 运行器缺席——判别力不可证，fail-closed" >&2; exit 2; }
+          FIX=.ci-gates-out/a7-fixtures
+          rm -rf "$FIX"
+          mkdir -p "$FIX"
+          cat > "$FIX/manifest.list" <<'FIXTURES_EOF'
+          probe-green|echo RECORDS=1|
+          probe-red7|exit 7|
+          probe-red2|exit 2|
+          probe-vac|echo RECORDS=0|
+          probe-bareskip|echo SKIP=自退无对账人|
+          probe-skipok|echo SKIP=环境停机演练 owner=ops-reconciler|
+          FIXTURES_EOF
+          HARNESS_RC=0
+          python3 -I .ci-gates-out/runner.py "$FIX/manifest.list" "$FIX" || HARNESS_RC=$?
+          if [ "$HARNESS_RC" -ne 0 ]; then
+            echo "门4/A-7: 探针 harness 错 rc=$HARNESS_RC——判别机自坏" >&2
+            exit "$HARNESS_RC"
+          fi
+          python3 -I - "$FIX/judgments.jsonl" <<'A7_PY'
+          import json
+          import sys
+          expect = {
+              "probe-green": "PASS",
+              "probe-red7": "FAIL",
+              "probe-red2": "DEADHAND",
+              "probe-vac": "VACUOUS",
+              "probe-bareskip": "BARE_SKIP",
+              "probe-skipok": "SKIP",
+          }
+          got = {}
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              for line in fh:
+                  r = json.loads(line)
+                  got[r["gate_id"]] = r["verdict"]
+          bad = []
+          for gid, want in sorted(expect.items()):
+              v = got.get(gid)
+              if v != want:
+                  bad.append(f"{gid}: 期望 {want} 实得 {v}")
+          if got.get("probe-green") == "PASS":
+              print("绿路对照: probe-green=PASS（判别机不冤枉好人）")
+          if bad:
+              print("门4/A-7 判别力负向自测红（判别机把必红探针判了非红=门已退化）:")
+              for b in bad:
+                  print("  RED " + b)
+              sys.exit(1)
+          print("门4/A-7: 六探针全对表（必红→FAIL/DEADHAND/VACUOUS/BARE_SKIP；绿路→PASS；合规 SKIP→SKIP）")
+          A7_PY
+
+      # ---- 门5 · A-8：真空求值防护 ----------------------------------------------
+      # Q1-门机制分级.md:155。判定记录数=0 记 VACUOUS 不计 PASS（runner 已一次成型）。
+      # 本步是第二消费面：不读 runner 的 verdict 结论，改用原始字段（rc/records）独立
+      # 复推判定语义并与之对账——PASS⇒records≥1；rc=0∧records=0 却判非 VACUOUS/SKIP
+      # = runner 漏判真空即红；VACUOUS 在场即红（覆盖不全不得计绿）；全门零判定记录即红。
+      - name: "门5 · A-8 真空求值防护（判定记录数=0 记 VACUOUS 不计 PASS；语义复推对账）"
+        if: ${{ always() }}
+        run: |
+          set -eu
+          echo "门5/A-8: 真空求值复核（第二消费面：原始字段复推 vs runner 判定）"
+          if [ ! -f .ci-gates-out/judgments.jsonl ]; then
+            echo "门5/A-8: 判定面缺席——真空求值不可证，fail-closed 红" >&2
+            exit 2
+          fi
+          python3 -I - .ci-gates-out/judgments.jsonl <<'VAC_PY'
+          import json
+          import sys
+          vac, bad, n = [], [], 0
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              for line in fh:
+                  r = json.loads(line)
+                  n += 1
+                  verdict, rc = r["verdict"], r["rc"]
+                  records = r.get("records", 0)
+                  if verdict == "PASS" and records < 1:
+                      bad.append(f"{r['gate_id']}: PASS 但判定记录数=0——真空门（不计 PASS）")
+                  if verdict == "VACUOUS":
+                      vac.append(f"{r['gate_id']}: 判定记录数=0 记 VACUOUS 不计 PASS")
+                      if rc != 0 or records != 0:
+                          bad.append(f"{r['gate_id']}: VACUOUS 语义不一致（rc={rc} records={records}）")
+                  if rc == 0 and records == 0 and verdict not in ("VACUOUS", "SKIP", "BARE_SKIP"):
+                      bad.append(f"{r['gate_id']}: rc=0 且判定记录数=0 却判 {verdict}——runner 漏判真空")
+          if n == 0:
+              bad.append("判定记录总数=0——全门真空")
+          if bad or vac:
+              print("门5/A-8 真空求值防护红:")
+              for b in vac + bad:
+                  print("  RED " + b)
+              sys.exit(1)
+          print(f"门5/A-8: {n} 门判定记录全非真空（语义复推与 runner 判定一致）")
+          VAC_PY
+
+      # ---- 门6 · A-9：死手断言 ----------------------------------------------------
+      # Q1-门机制分级.md:156。rc=2 不可证不猜绿；声明的读数面缺席/不可读即红；
+      # 读数面 mtime 距今超 fresh_max_seconds 即红（停摆不读绿）。
+      - name: "门6 · A-9 死手断言（读数过期/不可证 rc=2 不猜绿）"
+        if: ${{ always() }}
+        run: |
+          set -eu
+          echo "门6/A-9: 死手断言（新鲜度上限=${CI_GATES_FRESH_MAX_SECONDS}s）"
+          if [ ! -f .ci-gates-out/judgments.jsonl ]; then
+            echo "门6/A-9: 判定面缺席——死手断言不可证，fail-closed 红" >&2
+            exit 2
+          fi
+          python3 -I - .ci-gates-out/judgments.jsonl "$CI_GATES_FRESH_MAX_SECONDS" <<'DEAD_PY'
+          import json
+          import sys
+          import time
+          path, fresh_max = sys.argv[1], int(sys.argv[2])
+          now = int(time.time())
+          bad = []
+          with open(path, encoding="utf-8") as fh:
+              for line in fh:
+                  r = json.loads(line)
+                  gid = r["gate_id"]
+                  if r.get("epoch") is None:
+                      bad.append(f"{gid}: 判定记录无 epoch——判定不可证")
+                  if r.get("rc") == 2:
+                      bad.append(f"{gid}: rc=2（缺件/坏JSON/执行错）不可证不猜绿→DEADHAND")
+                  sp = r.get("surface_path")
+                  if sp:
+                      if r.get("surface_ts") is None:
+                          bad.append(f"{gid}: 读数面 {sp} 缺席/不可读——读数不可证")
+                      elif now - r["surface_ts"] > fresh_max:
+                          bad.append(f"{gid}: 读数面 {sp} 距今 {now - r['surface_ts']}s > 上限 {fresh_max}s——读数过期")
+          if bad:
+              print("门6/A-9 死手断言红:")
+              for b in bad:
+                  print("  RED " + b)
+              sys.exit(1)
+          print("门6/A-9: 读数全新鲜可证（无 rc=2、无过期、无缺面）")
+          DEAD_PY
