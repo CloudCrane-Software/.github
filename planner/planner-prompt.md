@@ -73,6 +73,9 @@
 5. `policy` 指向 `30-工件/波次自转器-20261106/制度-v1.md`。
 6. `budgets` 照抄输入：`{"anolis_mem_cap_g":45,"local_mem_cap_g":3,"anolis_concurrency":4}`。
 7. `base_sha`：若输出必须是 git SHA 十六进制串，且只能取 `allowed_base_shas` 中的值；无基线则省略该字段，禁编造。
+   - ❌ 输入 `allowed_base_shas` 为空数组时输出 `"base_sha": "5ee16ec4bfc9"`（编造占位——作废；空数组 ⇒ 字段不出现）
+   - ❌ 白名单非空时输出白名单外的任何 SHA（哪怕形似真 SHA——作废）
+   - ✅ 白名单非空时逐字复制其中唯一值；空数组时整字段省略
 8. `cards` 为数组，长度 0-20；`preflight` 可选（核验项清单）；空波次（cards=[]）必须附非空 `preflight` 说明缺口。
 9. 可选 `next_wave_seed`（下一波种子提示，数组）。
 
