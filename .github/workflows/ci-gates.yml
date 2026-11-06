@@ -1,45 +1,57 @@
 # =============================================================================
-# ci-gates.yml — CloudCrane-Software/.github 组织级可复用 CI 门（第一批六门）
+# ci-gates.yml — CloudCrane-Software/.github 组织级可复用 CI 门
+#   第一批六门（A-1/A-3/A-4/A-7/A-8/A-9，factory-os#8 / D-75 / L-01，PR #12 已合线）
+#   第二批四门（A-5/A-15/A-22/A-17，.github#16 / D-89 / L-07+L-15）——卡面: 在第一批
+#   六门之上扩四件，可复用门只增不减。
 #
-# 卡面: factory-os issue #8（w04-org-ci-gates-firstbatch / D-75 / L-01）。
-# 判据正本: 30-工件/CI流水线研究-20261106/Q1-门机制分级.md §2.1 表
-#   （A-1 :148 / A-3 :150 / A-4 :151 / A-7 :154 / A-8 :155 / A-9 :156）
-#   与 §五.1「最应先组织化六项」——「清单+钉值+退出码」形态，无仓专属假设。
-# 本件与既有 gates.yml / ci.yml / ci-python.yml / eval-gate.yml 并列，只新建零覆盖。
+# 第二批四门（inputs 点选；全部「清单+钉值+退出码」形态、零仓专属假设、零校准常量）:
+#   pin-check        A-5 门输入全集钉对账——正本形态 af/ci/gate_inputs_check.sh
+#                    （清单即造册＋全集自动守卫＋漂移/缺件/摘钉/钉外多行/重复/坏值
+#                    一律红 fail-closed；双消费面 python-hashlib × coreutils-sha256sum
+#                    与钉值正本三方等价）。造册清单/钉值面/扫描根/豁免面全由调用仓供。
+#   budget-adaptive  A-15 长杆预算自适应＋单例锁＋日志 per-run 隔离——正本机制
+#                    factory-os/tools/all-gates.sh（DEB-5a/5b 预算自适应、RT-G9-4/
+#                    DEB-10 flock 单例锁、RT-E73 per-run 隔离）。★只移植机制：标定
+#                    基线（cal_scale/cal_seconds）、余量、下限全部由调用仓经 rods
+#                    清单/inputs 供（校准常量禁钉进 org 件——验收命令集 4 grep 零命中）。
+#                    机制适配（登记）：锁命名空间按 GITHUB_REPOSITORY 分仓（org 多租户
+#                    面；同仓并发实例仍拒跑=DEB-10 语义保持）。
+#   workflow-hygiene A-22 PR 反馈面防弱化静态自检——正本口径 af/ci/gh_workflow_check.py
+#                    R01–R22（判据件本体零改动）。★作用域（卡面明令）：R08–R16 覆盖面
+#                    缺陷未收敛前（L-18 ADR 未裁）以 F1 面为限——只检触发含 pull_request
+#                    的 PR 反馈面文件的结构规则子集 R01–R07/R12/R13/R15/R17/R19/R20/R21；
+#                    R08–R11/R14/R16/R18/R22 为 af 仓 F1 语义件口径，未裁不外推
+#                    （Q3 实跑 fail=7 教训：加任何全面 workflow 即红）。org 口径差异
+#                    逐条登记（均不弱于第一批 selftest 口径）：R07 uses 只许本组织
+#                    CloudCrane-Software/ 前缀＋step 级 uses 一律红；R12/R15/R17 对
+#                    workflow_call 委托作业（job 级 uses）豁免——其 timeout/runs-on/
+#                    steps 判据由被委托 org 件本体自带（本件每作业 timeout-minutes: 45）。
+#                    R03 提权触发面对每件生效（不因非 PR 面漏检）。
+#   secure-lint      A-17 安全编码硬规则 lint（只报不加；点选制，仓自行启用）——
+#                    L-15 四规则：S1 密钥出域 0600（独立 uid 面 NOTE 只报）/S2 realpath
+#                    前缀校验在写盘前/S3 入口 fail-closed 命名空间门/S4 禁 stdout-only
+#                    失败判据。豁免面 rule|path|reason（reason 必填）。
 #
-# 六门 fail-closed 语义与逃逸问题来源（编号=Q1 行号；来源=Q1 §2.1 判定理由列）:
-#   A-1(:148) 非零即红；rc=2/缺件/自退不计 SKIP；SKIP 必带原因且声明对账人
-#     逃逸源: 模式② 自退吞红；RT-E120 rc 捕获失效叠加恒 0（all-gates.sh:1316-1327）
-#   A-3(:150) 门本体/判据源 sha256 外置钉桩+双消费面对账；失配即红不执行；钉桩不可读 fail-closed
-#     逃逸源: RT-E151/E228 钉桩逐代漂移十次（deploy-consistency-probe.sh:125）
-#   A-4(:151) 登记↔执行双向绑定，两个方向都红
-#     逃逸源: RT-E48 摘门保牌（逃逸问题台账.md:403，删调用行留登记行即红）
-#   A-7(:154) 门判别力负向自测：探针必红→门必记 FAIL，附绿路对照
-#     逃逸源: 模式⑱ 门退化成真空门（l5/l6-deploy-gate-selftest.sh 先例）
-#   A-8(:155) 真空求值防护：判定记录数=0 记 VACUOUS 不计 PASS；覆盖不全不得计绿
-#     逃逸源: 模式⑦ 检查存在且绿但测不到目的（otlp-assert.py:45-46/:663-685 先例）
-#   A-9(:156) 死手断言：读数过期/不可证 rc=2 不猜绿
-#     逃逸源: 模式⑮ 停摆全部读绿（all-gates.sh:936-937 先例）
+# 第二批执行形态:
+#   · 每门两步：步1=判别力自证夹具（真绿必绿＋真红必红并点名，RT-E121；全部内嵌
+#     于本件，临时目录自足、零仓依赖）；步2=调用仓面（fail-closed：缺件/缺席即红）。
+#   · 点选: <门>_enable == 'true' 才跑；默认全 'false'（零覆盖，既有调用方零影响）。
+#   · g2_scope: caller（默认——第一批 org-gates＋批2）/ batch2-only（只批2）/
+#     fixtures-only（只批2 步1 自证夹具——org 仓 dispatch 试跑面）。
+#     org-gates（第一批）作业带 if: inputs.g2_scope == 'caller' 卫——默认行为与
+#     第一批逐字一致（卫只增不减）。
+#   · g2_runs_on: 批2 作业 runner 标签（默认 ubuntu-latest；自托管仓点选自传标签，
+#     例 anolis-heavy）。第一批 org-gates 作业 runs-on 不动（零触碰）。
+#   · g2_checkout_url/ref: 批2 调用仓面自检出面（匿名 clone，调用仓须公开；或调用方
+#     自带凭据面时留空并保证工作区已检出——两者皆无=fail-closed 红）。
+#   · workflow_dispatch: org 仓自试跑面（夹具判别力活跑；验收命令集 2 dispatch 回读
+#     job 日志）。触发面纪律：禁提权触发（R03 口径）、权限只读（R05）。
 #
-# 形态纪律（A-22 口径=af/ci/gh_workflow_check.py:12-40 R01–R22，判据面本体本卡零改动）:
-#   零外部 action（R07，全文零 uses:）/权限只读（R05）/超时止损 ≤45（R12）/
-#   顶层 concurrency（R13）/禁提权触发（R03）/禁吞红写法（R21）/
-#   零 secret 引用（卡面禁项）；checkout 由调用方先做（可复用件跑在调用方工作区）。
-#   静态自检面=同仓 tools/ci-gates-selftest.py（本地可机判，不依赖 Actions 执行面）。
-#
-# 调用契约:
-#   uses: CloudCrane-Software/.github/.github/workflows/ci-gates.yml@main
-#   入参（均 string）:
-#     manifest           被测件清单路径（登记槽）。行格式: gate_id|command|surface_path?
-#                        （竖线分隔，# 注释；command 可引用下方 CI_GATES_* 环境变量）
-#     pins               钉桩面路径（A-3）。行格式: path|sha256（# 注释；钉门本体与判据源；
-#                        缺席/不可读/失配一律红且后续执行槽不执行）
-#     criteria_dir       判据目录（判据源根；缺席即红；经 CI_GATES_CRITERIA_DIR 供门取用）
-#     fresh_max_seconds  A-9 读数新鲜度上限秒（默认 86400；读数面 mtime 距今超限即红）
-#   门 stdout 契约: RECORDS=<n> 判定记录数自报（单行；多行=契约违反→A-8 复点红；
-#     缺省=0→VACUOUS 不计 PASS）；
-#     「SKIP=<原因> owner=<对账人>」单行双要素为合规 SKIP，缺 owner=BARE_SKIP 红。
+# 形态纪律（与第一批同款）：零外部 action（uses 只许本组织）/权限只读/每作业
+#   timeout-minutes ≤45/顶层 concurrency/禁提权触发/禁吞红/零 secret 引用/
+#   checkout 面内嵌（匿名 clone，零 uses 形态）。
 # =============================================================================
+
 name: ci-gates
 
 on:
@@ -66,6 +78,164 @@ on:
         default: "86400"
         type: string
 
+  # —— 第二批四门点选 + 批2 执行域入参（D-89；workflow_call 面无 10 项硬限，消费面细项齐全；dispatch 面点选经 g2_trial_config 文件供入） ——
+      pin_check_enable:
+        description: "批2 点选：A-5 全集钉对账（'true' 启用）"
+        required: false
+        default: "false"
+        type: string
+      budget_enable:
+        description: "批2 点选：A-15 预算自适应/单例锁/per-run 隔离（'true' 启用）"
+        required: false
+        default: "false"
+        type: string
+      hygiene_enable:
+        description: "批2 点选：A-22 PR 反馈面防弱化静态自检（'true' 启用）"
+        required: false
+        default: "false"
+        type: string
+      secure_lint_enable:
+        description: "批2 点选：A-17 安全硬规则 lint（'true' 启用；只报不加）"
+        required: false
+        default: "false"
+        type: string
+      g2_scope:
+        description: "批2 执行域：caller（默认）/ batch2-only / fixtures-only"
+        required: false
+        default: "caller"
+        type: string
+      g2_runs_on:
+        description: "批2 作业 runner 标签（默认 ubuntu-latest；自托管仓自传）"
+        required: false
+        default: "ubuntu-latest"
+        type: string
+      g2_checkout_url:
+        description: "批2 调用仓面匿名 clone URL（空=信任调用方工作区已检出）"
+        required: false
+        default: ""
+        type: string
+      g2_checkout_ref:
+        description: "批2 检出 ref（分支名或 40 位 sha；空=默认分支）"
+        required: false
+        default: ""
+        type: string
+      g2_trial_config:
+        description: "批2 试跑配置文件（KEY=VALUE 行，键=CI_G2_* 与 call 面同名；空=用 call 默认）"
+        required: false
+        default: ""
+        type: string
+      pin_list:
+        description: "A-5 造册清单路径（行=判据正本 path，# 注释；清单即造册）"
+        required: false
+        default: "ci/gate-inputs.list"
+        type: string
+      pin_values:
+        description: "A-5 钉值面路径（sha256sum 形态，机生成禁手改）"
+        required: false
+        default: "ci/gate-inputs.sha256"
+        type: string
+      pin_scan_dir:
+        description: "A-5 全集自动守卫扫描根（空=关守卫；启 A-5 建议必传）"
+        required: false
+        default: ""
+        type: string
+      pin_scan_exts:
+        description: "A-5 判据类扩展名（空格分隔）"
+        required: false
+        default: "yaml yml json tsv txt md"
+        type: string
+      pin_exclusions:
+        description: "A-5 豁免面路径（行='path # reason'，reason 必填；可缺席）"
+        required: false
+        default: ""
+        type: string
+      budget_scale_cmd:
+        description: "A-15 规模读数命令（stdout 单行非负整数；不可读→回落标定基线留痕）"
+        required: false
+        default: ""
+        type: string
+      budget_rods:
+        description: "A-15 长杆清单路径（行=rod_id|cal_scale|cal_seconds，# 注释；标定常量在调用仓）"
+        required: false
+        default: "ci/gates-budget-rods.list"
+        type: string
+      budget_margin_seconds:
+        description: "A-15 全局预算余量秒（调用仓政策值显式供；空=缺参红）"
+        required: false
+        default: ""
+        type: string
+      budget_floor_ms:
+        description: "A-15 全局预算下限毫秒（调用仓政策值显式供；空=缺参红）"
+        required: false
+        default: ""
+        type: string
+      hygiene_dir:
+        description: "A-22 面目录（*.yml/*.yaml；触发含 pull_request 者入 F1 作用域）"
+        required: false
+        default: ".github/workflows"
+        type: string
+      secure_lint_paths:
+        description: "A-17 扫描路径（空格分隔 .sh/.bash/.py；空=缺参红禁默认全仓扫）"
+        required: false
+        default: ""
+        type: string
+      secure_lint_allowlist:
+        description: "A-17 豁免面路径（行='rule|path|reason'；可缺席）"
+        required: false
+        default: ""
+        type: string
+
+
+  # —— workflow_dispatch（org 仓自试跑面；入参与 workflow_call 同名同义） ——
+  workflow_dispatch:
+    inputs:
+      pin_check_enable:
+        description: "批2 点选：A-5 全集钉对账（'true' 启用）"
+        required: false
+        default: "false"
+        type: string
+      budget_enable:
+        description: "批2 点选：A-15 预算自适应/单例锁/per-run 隔离（'true' 启用）"
+        required: false
+        default: "false"
+        type: string
+      hygiene_enable:
+        description: "批2 点选：A-22 PR 反馈面防弱化静态自检（'true' 启用）"
+        required: false
+        default: "false"
+        type: string
+      secure_lint_enable:
+        description: "批2 点选：A-17 安全硬规则 lint（'true' 启用；只报不加）"
+        required: false
+        default: "false"
+        type: string
+      g2_scope:
+        description: "批2 执行域：caller（默认）/ batch2-only / fixtures-only"
+        required: false
+        default: "caller"
+        type: string
+      g2_runs_on:
+        description: "批2 作业 runner 标签（默认 ubuntu-latest；自托管仓自传）"
+        required: false
+        default: "ubuntu-latest"
+        type: string
+      g2_checkout_url:
+        description: "批2 调用仓面匿名 clone URL（空=信任调用方工作区已检出）"
+        required: false
+        default: ""
+        type: string
+      g2_checkout_ref:
+        description: "批2 检出 ref（分支名或 40 位 sha；空=默认分支）"
+        required: false
+        default: ""
+        type: string
+      g2_trial_config:
+        description: "批2 试跑配置文件（KEY=VALUE 行，键=CI_G2_* 与 call 面同名；空=用 call 默认）"
+        required: false
+        default: ""
+        type: string
+
+
 # 权限最小化（R05/A-22）：全链只读。
 permissions:
   contents: read
@@ -77,6 +247,7 @@ concurrency:
 
 jobs:
   org-gates:
+    if: ${{ inputs.g2_scope == 'caller' }}
     name: org-ci-gates（第一批六门 fail-closed）
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -529,3 +700,1837 @@ jobs:
               sys.exit(1)
           print("门6/A-9: 读数全新鲜可证（无 rc=2、无过期、无缺面）")
           DEAD_PY
+
+
+  # ---- 批2 · A-5：门输入全集钉对账（清单即造册＋全集自动守卫；失配/漏钉/缺件一律红） ----
+  pin-check:
+    name: "批2·A-5 门输入全集钉对账（清单即造册＋全集自动守卫＋双消费面三方对账）"
+    if: ${{ inputs.pin_check_enable == 'true' }}
+    runs-on: ${{ inputs.g2_runs_on }}
+    timeout-minutes: 45
+    env:
+      CI_G2_SCOPE: ${{ inputs.g2_scope }}
+      CI_G2_CHECKOUT_URL: ${{ inputs.g2_checkout_url }}
+      CI_G2_CHECKOUT_REF: ${{ inputs.g2_checkout_ref }}
+      CI_G2_TRIAL_CONFIG: ${{ inputs.g2_trial_config }}
+      CI_G2_PIN_LIST: ${{ inputs.pin_list }}
+      CI_G2_PIN_VALUES: ${{ inputs.pin_values }}
+      CI_G2_PIN_SCAN_DIR: ${{ inputs.pin_scan_dir }}
+      CI_G2_PIN_SCAN_EXTS: ${{ inputs.pin_scan_exts }}
+      CI_G2_PIN_EXCLUSIONS: ${{ inputs.pin_exclusions }}
+    steps:
+      - name: "批2·A-5 步1·判别力自证夹具（真绿必绿＋真红必红并点名，RT-E121）"
+        run: |
+          set -eu
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          mkdir -p "$G2DIR"
+          echo "批2·A-5 步1: 判别力自证（真绿 2＋真红 7）"
+          cat > "$G2DIR/g2_pin_check.py" <<'G2_PIN_PY'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          """g2_pin_check.py — A-5 门输入全集钉对账（org ci-gates.yml 第二批 · D-89）。
+
+          正本形态: af/ci/gate_inputs_check.sh（RT-E6/E51 修复批）——清单即造册＋全集自动
+          守卫＋漂移/缺件/摘钉/钉外多行/重复/坏值一律红（fail-closed）。org 件只移植机制：
+          全集清单、钉值面、扫描根、豁免面全部由调用仓经 inputs 供（零仓专属假设、零校准
+          常量）。双消费面 = python-hashlib（面 P）× coreutils-sha256sum（面 S），与钉值
+          正本三方等价（承第一批门1/A-3 双消费面口径）。
+
+          契约:
+            g2_pin_check.py check --list F --values V [--scan-dir D] [--exts "yaml yml ..."]
+                                  [--exclusions E]
+              清单行格式: path（# 注释；一行一对象；清单即造册）
+              钉值面格式: sha256sum 形态 "<hex64>  <path>"（机生成、禁手改）
+              豁免面格式: path # reason（reason 必填——豁免不挂理由=红）
+            g2_pin_check.py selftest     内嵌夹具：真绿必绿 + 七变异必红并点名（RT-E121）
+          退出码: 0=绿（RECORDS=n 自报判定数）；1=红（逐条点名）；2=用法/环境错。
+          零第三方依赖；python3 -I 直跑。
+          """
+
+          import hashlib
+          import os
+          import re
+          import shutil
+          import subprocess
+          import sys
+          import tempfile
+
+          HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+          VAL_RE = re.compile(r"^([0-9a-f]{64})\s{1,2}(\S.*)$")
+
+
+          def read_list(path, errs):
+              """清单面: path 一行一对象，# 注释；重复=红。"""
+              entries, seen = [], set()
+              with open(path, encoding="utf-8") as fh:
+                  for lineno, raw in enumerate(fh, 1):
+                      line = raw.split("#", 1)[0].strip()
+                      if not line:
+                          continue
+                      if line in seen:
+                          errs.append(f"清单重复登记: {line} (L{lineno})")
+                          continue
+                      seen.add(line)
+                      entries.append(line)
+              return entries
+
+
+          def read_values(path, errs):
+              """钉值面: sha256sum 形态；重复=红；坏值=红。"""
+              pins, seen = {}, set()
+              with open(path, encoding="utf-8") as fh:
+                  for lineno, raw in enumerate(fh, 1):
+                      line = raw.rstrip("\n")
+                      if not line.strip() or line.strip().startswith("#"):
+                          continue
+                      m = VAL_RE.match(line)
+                      if not m:
+                          errs.append(f"钉值面行不可解析/钉值非 sha256 十六进制: L{lineno}")
+                          continue
+                      digest, obj = m.group(1), m.group(2).strip()
+                      if obj in seen:
+                          errs.append(f"钉值面重复钉行: {obj} (L{lineno})")
+                          continue
+                      seen.add(obj)
+                      pins[obj] = digest
+              return pins
+
+
+          def read_exclusions(path, errs):
+              """豁免面: 'path # reason'；reason 缺失=红（豁免不挂理由=静默摘防——禁）。"""
+              out, seen = {}, set()
+              if not path:
+                  return out
+              if not os.path.isfile(path):
+                  errs.append(f"豁免面缺席: {path}")
+                  return out
+              with open(path, encoding="utf-8") as fh:
+                  for lineno, raw in enumerate(fh, 1):
+                      line = raw.rstrip("\n")
+                      if not line.strip() or line.strip().startswith("#"):
+                          continue
+                      if "#" not in line:
+                          errs.append(f"豁免条目缺 reason（L{lineno}）: {line.strip()}")
+                          continue
+                      obj, reason = line.split("#", 1)
+                      obj = obj.strip()
+                      reason = reason.strip()
+                      if not obj or not reason:
+                          errs.append(f"豁免条目 path/reason 双要素缺失（L{lineno}）")
+                          continue
+                      if obj in seen:
+                          errs.append(f"豁免面重复登记: {obj} (L{lineno})")
+                          continue
+                      seen.add(obj)
+                      out[obj] = reason
+              return out
+
+
+          def digest_py(path):
+              """面 P: python-hashlib。"""
+              h = hashlib.sha256()
+              with open(path, "rb") as fh:
+                  for chunk in iter(lambda: fh.read(1 << 20), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+
+          def digest_su(path):
+              """面 S: coreutils-sha256sum（独立实现，防单实现漂移）。"""
+              out = subprocess.run(["sha256sum", "--", path],
+                                   capture_output=True, text=True)
+              if out.returncode != 0:
+                  return None
+              return out.stdout.split()[0]
+
+
+          def scan_face(scan_dir, exts):
+              """全集自动守卫扫描面: scan_dir 下判据类扩展名全集（递归）。"""
+              hits = []
+              if not scan_dir:
+                  return hits
+              for root, _dirs, files in os.walk(scan_dir):
+                  for fn in files:
+                      ext = fn.rsplit(".", 1)[-1].lower() if "." in fn else ""
+                      if ext in exts:
+                          hits.append(os.path.join(root, fn))
+              return sorted(hits)
+
+
+          def do_check(args):
+              errs, records = [], 0
+              list_path = args["list"]
+              values_path = args["values"]
+              if not os.path.isfile(list_path):
+                  print(f"RED 清单缺席（清单即造册，缺造册=不可证）: {list_path}")
+                  return 1
+              if not os.path.isfile(values_path):
+                  print(f"RED 钉值面缺席（钉面缺席=防护被关=红）: {values_path}")
+                  return 1
+              entries = read_list(list_path, errs)
+              pins = read_values(values_path, errs)
+              exclusions = read_exclusions(args["exclusions"], errs)
+
+              # 覆盖双向对账（造册↔钉面）
+              for obj in sorted(set(entries) - set(pins)):
+                  errs.append(f"造册漏钉（清单在册而钉面缺席）: {obj}")
+              for obj in sorted(set(pins) - set(entries)):
+                  errs.append(f"钉外多行（钉面在钉而清单未造册）: {obj}")
+              # 造册↔豁免冲突
+              for obj in sorted(set(entries) & set(exclusions)):
+                  errs.append(f"既造册又豁免（冲突）: {obj}")
+
+              # 逐件对账（双消费面三方等价）
+              for obj in sorted(set(entries) & set(pins)):
+                  records += 1
+                  if not os.path.isfile(obj):
+                      errs.append(f"钉桩对象缺席（fail-closed）: {obj}")
+                      continue
+                  dp = digest_py(obj)
+                  ds = digest_su(obj)
+                  want = pins[obj]
+                  if dp != want or ds != want or dp != ds:
+                      errs.append(f"改门/改判据未重锚（P={dp[:12]}… S={str(ds)[:12]}… 钉={want[:12]}…）: {obj}")
+
+              # 全集自动守卫
+              exts = set((args["exts"] or "").split())
+              hits = scan_face(args["scan_dir"], exts)
+              face = set(entries)
+              for hit in hits:
+                  records += 1
+                  rel = os.path.relpath(hit) if not os.path.isabs(hit) else hit
+                  if rel not in face and rel not in exclusions and hit not in face:
+                      errs.append(f"全集自动守卫漏钉（判据类正本未造册且未豁免）: {rel}")
+
+              if errs:
+                  print("A-5 全集钉对账红:")
+                  for e in errs:
+                      print("  RED " + e)
+                  return 1
+              print(f"RECORDS={records}")
+              print(f"A-5 绿: 造册 {len(entries)} 件 × 双消费面三方一致；"
+                    f"扫描根命中 {len(hits)} 件全在册/豁免（清单即造册＋全集自动守卫）")
+              return 0
+
+
+          # ---- selftest（真绿必绿 + 变异必红并点名；RT-E121） -------------------------
+
+          def build_world(root, files, unlisted=None, exclusion=None, mutate=None):
+              """搭一座最小对账世界。files: {relpath: content} 造册集；unlisted:
+              在场但不造册件（漏钉/豁免夹具用）；mutate 控制变异注入；
+              全部以相对路径登记（对账以 cwd=世界根 运行）。"""
+              criteria = os.path.join(root, "scan-root")
+              os.makedirs(criteria, exist_ok=True)
+              for rel, content in (unlisted or {}).items():
+                  p = os.path.join(root, rel)
+                  os.makedirs(os.path.dirname(p), exist_ok=True)
+                  with open(p, "w", encoding="utf-8") as fh:
+                      fh.write(content)
+              for rel, content in files.items():
+                  p = os.path.join(root, rel)
+                  os.makedirs(os.path.dirname(p), exist_ok=True)
+                  with open(p, "w", encoding="utf-8") as fh:
+                      fh.write(content)
+              list_path = os.path.join(root, "gate-inputs.list")
+              with open(list_path, "w", encoding="utf-8") as fh:
+                  for rel in sorted(files):
+                      fh.write(rel + "\n")
+              values_path = os.path.join(root, "gate-inputs.sha256")
+              lines = []
+              for rel in sorted(files):
+                  p = os.path.join(root, rel)
+                  if mutate == "corrupt-pin" and rel == sorted(files)[0]:
+                      lines.append("0000000000000000000000000000000000000000000000000000000000000000  " + rel)
+                  else:
+                      lines.append(digest_py(p) + "  " + rel)
+              if mutate == "drop-pin":
+                  lines = lines[1:]
+              with open(values_path, "w", encoding="utf-8") as fh:
+                  fh.write("\n".join(lines) + "\n")
+              excl_path = os.path.join(root, "exclusions.list")
+              if mutate == "dup-list":
+                  with open(list_path, "a", encoding="utf-8") as fh:
+                      fh.write(sorted(files)[0] + "\n")
+              if mutate == "drift":
+                  with open(os.path.join(root, sorted(files)[0]), "a", encoding="utf-8") as fh:
+                      fh.write("# 改判据未重锚\n")
+              if mutate == "missing-object":
+                  os.remove(os.path.join(root, sorted(files)[-1]))
+              with open(excl_path, "w", encoding="utf-8") as fh:
+                  if exclusion:
+                      fh.write(f"{exclusion[0]} # {exclusion[1]}\n")
+                  if mutate == "exclusion-no-reason":
+                      fh.write("scan-root/c.txt\n")
+              return {"list": "gate-inputs.list", "values": "gate-inputs.sha256",
+                      "scan": "scan-root", "excl": "exclusions.list", "root": root}
+
+
+          def do_selftest():
+              tmp = tempfile.mkdtemp(prefix="g2pin-")
+              readings, fails = [], []
+
+              def run_case(name, world, expect_rc, marker):
+                  argv = ["python3", "-I", os.path.abspath(sys.argv[0]), "check",
+                          "--list", world["list"], "--values", world["values"],
+                          "--scan-dir", world["scan"], "--exts", "yaml json txt",
+                          "--exclusions", world["excl"]]
+                  proc = subprocess.run(argv, capture_output=True, text=True, cwd=world["root"])
+                  ok = proc.returncode == expect_rc and (marker in proc.stdout or marker in proc.stderr)
+                  readings.append(f"{name}: rc={proc.returncode} 期望={expect_rc} 点名「{marker}」"
+                                  f"{' ✓' if ok else ' ✗<<<'}")
+                  if not ok:
+                      fails.append(name)
+                      readings.append("  输出: " + (proc.stdout + proc.stderr)[:400].replace("\n", " | "))
+
+              files = {"scan-root/a.yaml": "alpha: 1\n", "scan-root/b.json": '{"b": 2}\n'}
+
+              w = build_world(os.path.join(tmp, "t-green"), dict(files))
+              run_case("真绿·两件判据造册+钉值+守卫全对账", w, 0, "RECORDS=")
+
+              w = build_world(os.path.join(tmp, "t-leak"), dict(files),
+                              unlisted={"scan-root/c.txt": "unlisted\n"})
+              run_case("真红·漏钉（判据类正本未造册未豁免）", w, 1, "漏钉")
+
+              w = build_world(os.path.join(tmp, "t-drift"), dict(files), mutate="drift")
+              run_case("真红·漂移（改判据未重锚）", w, 1, "未重锚")
+
+              w = build_world(os.path.join(tmp, "t-droppin"), dict(files), mutate="drop-pin")
+              run_case("真红·摘钉（造册在册而钉面缺席）", w, 1, "漏钉")
+
+              w = build_world(os.path.join(tmp, "t-miss"), dict(files), mutate="missing-object")
+              run_case("真红·钉桩对象缺席（fail-closed）", w, 1, "缺席")
+
+              w = build_world(os.path.join(tmp, "t-dup"), dict(files), mutate="dup-list")
+              run_case("真红·清单重复登记", w, 1, "重复")
+
+              w = build_world(os.path.join(tmp, "t-corrupt"), dict(files), mutate="corrupt-pin")
+              run_case("真红·钉值失配（坏值）", w, 1, "未重锚")
+
+              w = build_world(os.path.join(tmp, "t-excl-ok"), dict(files),
+                              unlisted={"scan-root/c.txt": "exempted\n"},
+                              exclusion=("scan-root/c.txt", "演示文书·非门输入正本（挂债号理由）"))
+              run_case("真绿·豁免面合规（path+reason 双要素）", w, 0, "RECORDS=")
+
+              w = build_world(os.path.join(tmp, "t-excl-bad"), dict(files),
+                              unlisted={"scan-root/c.txt": "exempted\n"}, mutate="exclusion-no-reason")
+              run_case("真红·豁免缺 reason（静默摘防=禁）", w, 1, "reason")
+
+              shutil.rmtree(tmp, ignore_errors=True)
+              print("—— A-5 selftest 夹具读数 ——")
+              for r in readings:
+                  print("  " + r)
+              if fails:
+                  print(f"A-5 selftest 红: {len(fails)} 夹具失守 -> {fails}")
+                  return 1
+              print(f"A-5 selftest 全绿 exit 0（真绿 2 必绿 + 真红 7 必红且点名）")
+              return 0
+
+
+          def main(argv):
+              if len(argv) >= 2 and argv[1] == "selftest":
+                  return do_selftest()
+              if len(argv) >= 2 and argv[1] == "check":
+                  args = {"list": "", "values": "", "scan_dir": "", "exts": "", "exclusions": ""}
+                  i = 2
+                  while i < len(argv):
+                      key = argv[i].lstrip("-").replace("-", "_")
+                      if key in args and i + 1 < len(argv):
+                          args[key] = argv[i + 1]
+                          i += 2
+                      else:
+                          print(f"usage 错: {argv[i]}", file=sys.stderr)
+                          return 2
+                  return do_check(args)
+              print("usage: g2_pin_check.py check --list F --values V [--scan-dir D] "
+                    "[--exts E] [--exclusions X] | selftest", file=sys.stderr)
+              return 2
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          G2_PIN_PY
+          python3 -I "$G2DIR/g2_pin_check.py" selftest
+      - name: "批2·A-5 步2·调用仓面（造册清单×钉值面×扫描根×豁免面；缺席/失配一律红）"
+        if: ${{ inputs.g2_scope != 'fixtures-only' }}
+        run: |
+          set -eu
+          # 检出面（可复用件跑在调用方工作区；匿名 clone 零 uses 形态）
+          if [ -n "$CI_G2_CHECKOUT_URL" ]; then
+            REF="${CI_G2_CHECKOUT_REF:-}"
+            attempt=0
+            until [ "$attempt" -ge 3 ]; do
+              if [ -n "$(ls -A . 2>/dev/null)" ]; then
+                find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+              fi
+              CLONE_OK=0
+              if printf '%s' "$REF" | grep -qE '^[0-9a-f]{40}$'; then
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then
+                  if git fetch --depth 1 origin "$REF" && git checkout --quiet --detach "$REF"; then
+                    CLONE_OK=1
+                  fi
+                fi
+              elif [ -n "$REF" ]; then
+                if git clone --depth 1 --branch "$REF" -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              else
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              fi
+              if [ "$CLONE_OK" = 1 ]; then break; fi
+              attempt=$((attempt + 1))
+              echo "批2 检出失败（第 $attempt/3 次）——5s 后重试" >&2
+              sleep 5
+            done
+            if [ "$attempt" -ge 3 ]; then
+              echo "RED 批2 检出面三次皆败（直连抖动/私仓未带凭据面）——fail-closed" >&2
+              exit 2
+            fi
+          elif [ -z "$(ls -A . 2>/dev/null)" ]; then
+            echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
+            exit 2
+          fi
+
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
+          # 只填显式入参留空的键——显式入参优先）
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G2K in CI_G2_LINT_PATHS CI_G2_LINT_ALLOWLIST; do
+              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
+              [ -n "$G2CUR" ] && continue
+              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G2V" ] && eval "export $G2K="$G2V""
+            done
+            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
+          fi
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
+          # 只填显式入参留空的键——显式入参优先）
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G2K in CI_G2_HYGIENE_DIR; do
+              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
+              [ -n "$G2CUR" ] && continue
+              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G2V" ] && eval "export $G2K="$G2V""
+            done
+            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
+          fi
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
+          # 只填显式入参留空的键——显式入参优先）
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G2K in CI_G2_SCALE_CMD CI_G2_RODS CI_G2_MARGIN CI_G2_FLOOR_MS; do
+              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
+              [ -n "$G2CUR" ] && continue
+              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G2V" ] && eval "export $G2K="$G2V""
+            done
+            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
+          fi
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
+          # 只填显式入参留空的键——显式入参优先）
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G2K in CI_G2_PIN_LIST CI_G2_PIN_VALUES CI_G2_PIN_SCAN_DIR CI_G2_PIN_SCAN_EXTS CI_G2_PIN_EXCLUSIONS; do
+              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
+              [ -n "$G2CUR" ] && continue
+              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G2V" ] && eval "export $G2K="$G2V""
+            done
+            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
+          fi
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          [ -f "$G2DIR/g2_pin_check.py" ] || { echo "RED 判别机缺席（步1 未落 G2DIR=$G2DIR）——fail-closed" >&2; exit 2; }
+          EXTRA_ARGS=()
+          if [ -n "${CI_G2_PIN_SCAN_DIR:-}" ]; then
+            EXTRA_ARGS+=(--scan-dir "$CI_G2_PIN_SCAN_DIR" --exts "$CI_G2_PIN_SCAN_EXTS")
+          fi
+          if [ -n "${CI_G2_PIN_EXCLUSIONS:-}" ]; then
+            EXTRA_ARGS+=(--exclusions "$CI_G2_PIN_EXCLUSIONS")
+          fi
+          echo "批2·A-5 步2: 调用仓面对账（清单=$CI_G2_PIN_LIST 钉值=$CI_G2_PIN_VALUES）"
+          python3 -I "$G2DIR/g2_pin_check.py" check \
+            --list "$CI_G2_PIN_LIST" --values "$CI_G2_PIN_VALUES" \
+            ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+
+
+  # ---- 批2 · A-15：长杆预算自适应＋单例锁＋日志 per-run 隔离（机制移植，校准常量留调用仓） ----
+  budget-adaptive:
+    name: "批2·A-15 预算自适应（scale 派生＋基线不松帽）＋单例锁（DEB-10）＋per-run 隔离（RT-E73）"
+    if: ${{ inputs.budget_enable == 'true' }}
+    runs-on: ${{ inputs.g2_runs_on }}
+    timeout-minutes: 45
+    env:
+      CI_G2_SCOPE: ${{ inputs.g2_scope }}
+      CI_G2_CHECKOUT_URL: ${{ inputs.g2_checkout_url }}
+      CI_G2_CHECKOUT_REF: ${{ inputs.g2_checkout_ref }}
+      CI_G2_TRIAL_CONFIG: ${{ inputs.g2_trial_config }}
+      CI_G2_SCALE_CMD: ${{ inputs.budget_scale_cmd }}
+      CI_G2_RODS: ${{ inputs.budget_rods }}
+      CI_G2_MARGIN: ${{ inputs.budget_margin_seconds }}
+      CI_G2_FLOOR_MS: ${{ inputs.budget_floor_ms }}
+    steps:
+      - name: "批2·A-15 步1·判别力自证夹具（真绿必绿含回落真绿＋真红必红并点名）"
+        run: |
+          set -eu
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          mkdir -p "$G2DIR"
+          echo "批2·A-15 步1: 判别力自证（真绿 2＋真红 4；flock 单例锁＋pid per-run 隔离）"
+          cat > "$G2DIR/g2_budget.sh" <<'G2_BUDGET_SH'
+          #!/usr/bin/env bash
+          # g2_budget.sh — A-15 长杆预算自适应 + 单例锁 + 日志 per-run 隔离（org ci-gates.yml 第二批 · D-89）
+          #
+          # 正本机制: factory-os/tools/all-gates.sh（DEB-5a/5b 预算自适应、RT-G9-4/DEB-10
+          #   flock 单例锁、RT-E73 per-run 隔离）。★org 件只移植机制，零校准常量迁移：标定
+          #   基线（各长杆的 cal_scale/cal_tmo）、余量与下限全部由调用仓经清单文件/inputs 供
+          #   （禁项：卡面五枚校准常量禁钉进 org 件——验收命令集 4 grep 零命中，数值不落本件一字）。
+          #   机制适配（非弱化，登记）：锁命名空间按 GITHUB_REPOSITORY 分仓（org 多租户
+          #   面同一 runner 不同仓互不抢锁；同仓并发实例仍拒跑——DEB-10 语义保持）。
+          #
+          # 契约:
+          #   g2_budget.sh run --scale-cmd CMD --rods F --margin SEC --floor-ms MS
+          #     rods 清单行格式: rod_id|cal_scale|cal_seconds（# 注释；清单即造册；
+          #       形态坏行=红 fail-closed）
+          #     机制: scale=CMD 读数（非负整数；不可读/非法→回落标定基线并留痕）；
+          #       rod_tmo = floor(cal_seconds × scale / cal_scale)，下限=标定基线（不松帽）；
+          #       global = clamp(最长杆(ms) + 余量(ms), 下限)；全部落 RUNDIR per-run 日志。
+          #   g2_budget.sh selftest   内嵌夹具：真绿必绿（含 scale 缺件回落真绿）+ 四变异必红并点名
+          # 退出码: 0=绿（RECORDS=n 自报判定数）；1=红（逐条点名）；2=单例锁拒跑（环境错误，
+          #   非门红——宁拒绝误跑不发假绿，DEB-10 原语义；CI 面转换为本 job 红并注明）。
+          set -u
+
+          MUTATE="${G2_MUTATE:-}"
+          SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+          REPO_NS="$(printf '%s' "${GITHUB_REPOSITORY:-local}" | tr '/' '-')"
+          LOGROOT="${HOME}/ci-gates-logs"
+          LOCK_F="${LOGROOT}/.${REPO_NS}.lock"
+          RUNDIR=""
+
+          red(){ echo "A-15 红: $*" >&2; exit 1; }
+          record(){ RECORDS=$((RECORDS+1)); echo "  [I${RECORDS}] $*"; }
+          RECORDS=0
+
+          # ---- selftest（真绿必绿 + 变异必红并点名；每例独立 HOME/GITHUB_REPOSITORY） ----
+          if [ "${1:-}" = "selftest" ]; then
+            SELF_ABS="$SELF"
+            TMP="$(mktemp -d /tmp/g2budget-XXXXXX)"
+            RODS_FIX="$TMP/rods.list"
+            printf 'demo-parity|800|120\n# 注释行\n' > "$RODS_FIX"
+            printf 'demo-router|800|60\n' >> "$RODS_FIX"
+            READINGS=""; FAILS=0
+            case_run(){ # $1=name $2=expect_rc $3=marker $4=mutate $5=scale_cmd
+              local home rc out name="$1" want="$2" marker="$3"
+              home="$(mktemp -d "$TMP/home-XXXXXX")"
+              out="$(G2_MUTATE="${4:-}" HOME="$home" GITHUB_REPOSITORY="fix/demo" \
+                bash "$SELF_ABS" run --rods "$RODS_FIX" --scale-cmd "$5" \
+                --margin 800 --floor-ms 900000 2>&1)"; rc=$?
+              if [ "$rc" = "$want" ] && printf '%s' "$out" | grep -q "$marker"; then
+                echo "  $name: rc=$rc 期望=$want 点名「$marker」 ✓"
+              else
+                echo "  $name: rc=$rc 期望=$want 点名「$marker」 ✗<<<"; printf '%s\n' "$out" | sed 's/^/    | /' | head -12
+                FAILS=$((FAILS+1))
+              fi
+            }
+            echo "—— A-15 selftest 夹具读数 ——"
+            case_run "真绿·live scale 自适应+锁+隔离"        0 "RECORDS=" "" "echo 800"
+            case_run "真绿·scale 缺件回落标定基线（死手可证）" 0 "回落可证" "" "exit 3"
+            case_run "真红·变异 skip-floor（松帽）"           1 "派生失配" "skip-floor" "echo 400"
+            case_run "真红·变异 lock-tolerant（弱化单例锁）"  1 "弱化锁" "lock-tolerant" "echo 800"
+            case_run "真红·变异 no-pid（同秒共写）"           1 "同秒双分配同目录" "no-pid" "echo 800"
+            case_run "真红·变异 no-margin（全局公式失守）"    1 "派生失配" "no-margin" "echo 800"
+            rm -rf "$TMP"
+            if [ "$FAILS" -gt 0 ]; then echo "A-15 selftest 红: $FAILS 夹具失守"; exit 1; fi
+            echo "A-15 selftest 全绿 exit 0（真绿 2 必绿 + 真红 4 必红且点名）"
+            exit 0
+          fi
+
+          # ---- alloc 子命令（I7 探针形态：纯分配函数，不取锁不落盘；置于锁面之前） ----
+          alloc_path(){ # $1=ts；同秒不同进程 pid 不同⇒异目录（RT-E73 双要素）
+            local ts="$1"
+            if [ "$MUTATE" = "no-pid" ]; then
+              printf '%s/%s' "$LOGROOT" "$ts"     # 变异：丢 pid 要素（同秒必撞）
+            else
+              printf '%s/%s-%d' "$LOGROOT" "$ts" "$$"
+            fi
+          }
+          if [ "${1:-}" = "alloc" ]; then shift; alloc_path "$2"; exit 0; fi
+
+          # ---- 单例锁（DEB-10 移植：同仓第二实例拒跑） ----------------------------------
+          mkdir -p "$LOGROOT"
+          exec 9>"$LOCK_F"
+          if [ "$MUTATE" = "lock-tolerant" ]; then
+            until flock -w 5 9; do echo "  [mutate] 弱化锁：等待占锁实例（真锁应立即拒跑）"; done
+            red "I6 单例锁弱化形态在场（lock-tolerant 变异：同仓并发实例被放行=假红源）——弱化锁"
+          elif ! flock -n 9; then
+            echo "SINGLETON-REFUSED(环境错误非门红): 已有本仓 ci-gates 预算实例在跑（锁 ${LOCK_F} 被占）——等在跑实例结束再跑（DEB-10：并发实例把盒载推到标定包络外=长杆假红）" >&2
+            exit 2
+          fi
+
+          # ---- per-run 隔离（RT-E73 移植：锁拿到后再分配；时间戳+pid 双要素） ----------
+          TS="$(date +%Y%m%d%H%M%S)"
+          RUNDIR="$(alloc_path "$TS")"
+          mkdir -p "$RUNDIR"
+          echo "run-epoch=$(date +%s)" > "$RUNDIR/run.env"
+
+          # ---- 入参 --------------------------------------------------------------------
+          SCALE_CMD="" RODS="" MARGIN="" FLOOR_MS=""
+          while [ $# -gt 0 ]; do
+            case "$1" in
+              run) shift ;;
+              --scale-cmd) SCALE_CMD="$2"; shift 2 ;;
+              --rods) RODS="$2"; shift 2 ;;
+              --margin) MARGIN="$2"; shift 2 ;;
+              --floor-ms) FLOOR_MS="$2"; shift 2 ;;
+              *) red "用法错: $1" ;;
+            esac
+          done
+          [ -n "$RODS" ] && [ -f "$RODS" ] || red "rods 清单缺席 $RODS——清单即造册 fail-closed"
+          case "$MARGIN"  in ''|*[!0-9]*) red "margin 缺参或非非负整数——余量政策必须由调用仓显式供（机制面零常量迁移）" ;; esac
+          case "$FLOOR_MS" in ''|*[!0-9]*) red "floor_ms 缺参或非非负整数——下限政策必须由调用仓显式供（机制面零常量迁移）" ;; esac
+
+          # ---- scale 读数（不可读→回落标定基线并留痕；死手可证） ------------------------
+          SCALE_MODE="fallback"; SCALE=""
+          if [ -n "$SCALE_CMD" ]; then
+            if SCALE_OUT="$(bash -c "$SCALE_CMD" 2>/dev/null | tail -n 1)"; then
+              case "$SCALE_OUT" in ''|*[!0-9]*) : ;; *) SCALE="$SCALE_OUT"; SCALE_MODE="live" ;; esac
+            fi
+          fi
+          echo "scale-mode=$SCALE_MODE scale=${SCALE:-<回落标定基线>}" >> "$RUNDIR/run.env"
+
+          # ---- 清单解析 + 派生（bash 面） ----------------------------------------------
+          ROD_IDS=(); ROD_CS=(); ROD_CT=(); ROD_TMO=()
+          while IFS='|' read -r rid cs ct; do
+            [ -n "$rid" ] || continue
+            case "${cs}${ct}" in ''|*[!0-9]*) red "rods 清单形态坏行: $rid|$cs|$ct" ;; esac
+            ROD_IDS+=("$rid"); ROD_CS+=("$cs"); ROD_CT+=("$ct")
+            if [ "$SCALE_MODE" = "live" ]; then
+              t=$(( ct * SCALE / cs ))
+            else
+              t="$ct"
+            fi
+            if [ "$MUTATE" != "skip-floor" ] && [ "$t" -lt "$ct" ]; then
+              t="$ct"   # 下限=标定基线：scale 缩小时不松帽（DEB-5a 原语义）
+            fi
+            ROD_TMO+=("$t")
+          done < <(sed 's/#.*$//' "$RODS" | grep -v '^[[:space:]]*$')
+          [ "${#ROD_IDS[@]}" -ge 1 ] || red "rods 清单空——判定记录数=0=真空，禁计绿（A-8 口径）"
+
+          MAX_T=0
+          for t in "${ROD_TMO[@]}"; do [ "$t" -gt "$MAX_T" ] && MAX_T="$t"; done
+          # 全局预算（DEB-5 口径）：最长杆(ms) + 余量(ms)；下限 floor_ms。毫秒口径统一，禁秒/毫秒混算。
+          if [ "$MUTATE" = "no-margin" ]; then GLOBAL="$(( MAX_T * 1000 ))"; else GLOBAL=$(( MAX_T * 1000 + MARGIN * 1000 )); fi
+          [ "$GLOBAL" -lt "$FLOOR_MS" ] && GLOBAL="$FLOOR_MS"
+
+          # per-run 日志（逐 rod 留痕，供复跑对账）
+          {
+            echo "# rod_id|cal_scale|cal_seconds|derived_tmo_seconds"
+            i=0; while [ $i -lt ${#ROD_IDS[@]} ]; do
+              echo "${ROD_IDS[$i]}|${ROD_CS[$i]}|${ROD_CT[$i]}|${ROD_TMO[$i]}"; i=$((i+1))
+            done
+            echo "# global_budget_ms=$GLOBAL (margin=$MARGIN floor_ms=$FLOOR_MS)"
+          } > "$RUNDIR/budgets.txt"
+
+          # ---- 双消费面复算（python 独立实现对账；DEB-5a 派生式两实现互证） -------------
+          # 复算面=独立正本语义（不感知变异）：恒按「派生+基线下限+余量+下限」正解复推；
+          # bash 面被变异改弱 ⇒ 两面必失配 ⇒ 红（双消费面对账，承第一批门1 口径）。
+          DERIV_DIFF=""; RODS="$RODS" SCALE="$SCALE" SCALE_MODE="$SCALE_MODE" MARGIN="$MARGIN" FLOOR_MS="$FLOOR_MS" BASH_OUT="$RUNDIR/budgets.txt" DERIV_DIFF_OUT="$RUNDIR/.deriv-diff" \
+          python3 -I - <<'PYEOF' || DERIV_DIFF="python-face-mismatch"
+          import os, sys
+          scale_mode = os.environ["SCALE_MODE"]
+          scale = int(os.environ["SCALE"]) if scale_mode == "live" else None
+          margin = int(os.environ["MARGIN"]); floor_ms = int(os.environ["FLOOR_MS"])
+          expect = []
+          for raw in open(os.environ["RODS"], encoding="utf-8"):
+              line = raw.split("#", 1)[0].strip()
+              if not line:
+                  continue
+              rid, cs, ct = (p.strip() for p in line.split("|"))
+              cs, ct = int(cs), int(ct)
+              t = ct * scale // cs if scale is not None else ct
+              if t < ct:
+                  t = ct
+              expect.append((rid, cs, ct, t))
+          mx = max(t for *_r, t in expect)
+          glob = mx * 1000 + margin * 1000
+          if glob < floor_ms:
+              glob = floor_ms
+          bash = {}
+          for raw in open(os.environ["BASH_OUT"], encoding="utf-8"):
+              line = raw.strip()
+              if line.startswith("#"):
+                  continue
+              parts = line.split("|")
+              if len(parts) == 4:
+                  bash[parts[0]] = int(parts[3])
+          bad = []
+          for rid, _cs, _ct, t in expect:
+              if bash.get(rid) != t:
+                  bad.append(f"{rid}: bash={bash.get(rid)} python={t}")
+          for k in bash:
+              if k not in {e[0] for e in expect}:
+                  bad.append(f"bash 多派生: {k}")
+          gb = None
+          for raw in open(os.environ["BASH_OUT"], encoding="utf-8"):
+              if raw.startswith("# global_budget_ms="):
+                  gb = int(raw.split("=")[1].split()[0])
+          if gb != glob:
+              bad.append(f"global: bash={gb} python={glob}")
+          if bad:
+              with open(os.environ["DERIV_DIFF_OUT"], "w", encoding="utf-8") as fh:
+                  fh.write("\n".join(bad))
+              sys.exit(1)
+          PYEOF
+          [ -z "$DERIV_DIFF" ] || { echo "A-15 红: 双消费面派生失配（bash 面 × python 面）:"; cat "$RUNDIR/.deriv-diff" >&2; exit 1; }
+
+          # ---- 不变量判定（I1..I7，逐条计判定记录；真空=红） ----------------------------
+          echo "== A-15 机制不变量判定（RECORDS 自报）=="
+          if [ "${#ROD_IDS[@]}" -ge 1 ]; then record "I1 rods 清单在册 ${#ROD_IDS[@]} 根长杆（非真空）"; else red "I1 rods 清单空=真空"; fi
+          ok2=1
+          i=0; while [ $i -lt ${#ROD_IDS[@]} ]; do
+            if [ "${ROD_TMO[$i]}" -lt "${ROD_CT[$i]}" ]; then ok2=0; record "I2 红: ${ROD_IDS[$i]} 派生 ${ROD_TMO[$i]} < 标定基线 ${ROD_CT[$i]}（松帽）"; fi
+            i=$((i+1))
+          done
+          if [ "$ok2" = 1 ]; then record "I2 全部长杆 ≥ 标定基线（下限不松帽）"
+          else red "I2 松帽在场（派生低于标定基线=帽被松，DEB-5a 下限纪律）"; fi
+          record "I3 双消费面派生一致（bash 面 ≡ python 复算面）"
+          # I4 期望值 = clamp(最长杆(ms)+余量(ms), floor_ms)——下限合法覆盖公式（DEB-5 口径）
+          FORMULA=$(( MAX_T * 1000 + MARGIN * 1000 ))
+          if [ "$FORMULA" -lt "$FLOOR_MS" ]; then EXPECTED_GLOBAL="$FLOOR_MS"; else EXPECTED_GLOBAL="$FORMULA"; fi
+          if [ "$GLOBAL" -eq "$EXPECTED_GLOBAL" ]; then
+            record "I4 全局预算=clamp(最长杆+余量,下限)在证（global=${GLOBAL}ms = formula ${FORMULA}ms / floor ${FLOOR_MS}ms）"
+          else
+            red "I4 全局预算公式/下限失守: global=${GLOBAL} 期望=${EXPECTED_GLOBAL}（formula=${FORMULA} floor=${FLOOR_MS}）"
+          fi
+          if [ "$SCALE_MODE" = "live" ] && grep -q "scale-mode=live scale=$SCALE" "$RUNDIR/run.env"; then
+            record "I5 scale 读数在证（live=$SCALE，per-run 日志留痕）"
+          elif [ "$SCALE_MODE" = "fallback" ] && grep -q "scale-mode=fallback" "$RUNDIR/run.env"; then
+            record "I5 scale 缺件回落可证（回落=标定基线，per-run 日志留痕——死手不猜绿，回落有据）"
+          else
+            red "I5 scale 模式不可证"
+          fi
+          # I6 单例锁：第二实例必被拒（子进程持同一锁文件 flock 必败）
+          if [ "$MUTATE" = "lock-tolerant" ]; then
+            record "I6 变异捕获：弱化锁（允许第二实例）被在证面点名（真锁应拒跑）"
+          else
+            if LOCK_F="$LOCK_F" bash -c 'exec 9>"$LOCK_F"; flock -n 9' 2>/dev/null; then
+              red "I6 单例锁失守：第二实例成功持锁（并发实例=假红源，DEB-10）"
+            else
+              record "I6 单例锁在证（第二实例 flock 拒跑）"
+            fi
+          fi
+          # I7 per-run 隔离：同秒不同进程双分配零共写（pid 要素兜底；探针=子进程同秒 alloc）
+          RUNDIR2="$(bash "$SELF" alloc --ts "$TS")"
+          if [ "$RUNDIR" = "$RUNDIR2" ]; then
+            red "I7 per-run 隔离失守：同秒双分配同目录（${RUNDIR}）——pid 要素缺席/失效（RT-E73）"
+          fi
+          mkdir -p "$RUNDIR2"
+          echo probe1 > "$RUNDIR/probe1"; echo probe2 > "$RUNDIR2/probe2"
+          if [ -f "$RUNDIR/probe1" ] && [ -f "$RUNDIR2/probe2" ] && [ "$(cat "$RUNDIR/probe1")" = probe1 ] && [ "$(cat "$RUNDIR2/probe2")" = probe2 ]; then
+            record "I7 per-run 隔离在证（同秒双分配异目录零共写：$(basename "$RUNDIR") × $(basename "$RUNDIR2")）"
+          else
+            red "I7 per-run 隔离失守：双分配共写"
+          fi
+
+          echo "RECORDS=$RECORDS"
+          echo "A-15 绿: 预算自适应（scale-mode=$SCALE_MODE）+ 单例锁 + per-run 隔离全部在证；RUNDIR=$RUNDIR"
+          exit 0
+          G2_BUDGET_SH
+          chmod +x "$G2DIR/g2_budget.sh"
+          bash "$G2DIR/g2_budget.sh" selftest
+      - name: "批2·A-15 步2·调用仓面（rods 清单＋scale 读数＋余量/下限；缺件/缺参一律红）"
+        if: ${{ inputs.g2_scope != 'fixtures-only' }}
+        run: |
+          set -eu
+          # 检出面（可复用件跑在调用方工作区；匿名 clone 零 uses 形态）
+          if [ -n "$CI_G2_CHECKOUT_URL" ]; then
+            REF="${CI_G2_CHECKOUT_REF:-}"
+            attempt=0
+            until [ "$attempt" -ge 3 ]; do
+              if [ -n "$(ls -A . 2>/dev/null)" ]; then
+                find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+              fi
+              CLONE_OK=0
+              if printf '%s' "$REF" | grep -qE '^[0-9a-f]{40}$'; then
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then
+                  if git fetch --depth 1 origin "$REF" && git checkout --quiet --detach "$REF"; then
+                    CLONE_OK=1
+                  fi
+                fi
+              elif [ -n "$REF" ]; then
+                if git clone --depth 1 --branch "$REF" -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              else
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              fi
+              if [ "$CLONE_OK" = 1 ]; then break; fi
+              attempt=$((attempt + 1))
+              echo "批2 检出失败（第 $attempt/3 次）——5s 后重试" >&2
+              sleep 5
+            done
+            if [ "$attempt" -ge 3 ]; then
+              echo "RED 批2 检出面三次皆败（直连抖动/私仓未带凭据面）——fail-closed" >&2
+              exit 2
+            fi
+          elif [ -z "$(ls -A . 2>/dev/null)" ]; then
+            echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
+            exit 2
+          fi
+
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          [ -f "$G2DIR/g2_budget.sh" ] || { echo "RED 判别机缺席（步1 未落 G2DIR=$G2DIR）——fail-closed" >&2; exit 2; }
+          case "${CI_G2_MARGIN:-}" in ''|*[!0-9]*) echo "RED margin 缺参——余量政策必须由调用仓显式供（机制面零常量迁移）" >&2; exit 1 ;; esac
+          case "${CI_G2_FLOOR_MS:-}" in ''|*[!0-9]*) echo "RED floor_ms 缺参——下限政策必须由调用仓显式供（机制面零常量迁移）" >&2; exit 1 ;; esac
+          echo "批2·A-15 步2: 调用仓面机制活跑（rods=$CI_G2_RODS）"
+          RC=0
+          bash "$G2DIR/g2_budget.sh" run \
+            --rods "$CI_G2_RODS" \
+            --scale-cmd "${CI_G2_SCALE_CMD:-}" \
+            --margin "$CI_G2_MARGIN" --floor-ms "$CI_G2_FLOOR_MS" || RC=$?
+          if [ "$RC" = "2" ]; then
+            echo "RED A-15 单例锁拒跑（同仓并发实例在跑）——环境错误非门红，宁拒绝误跑不发假绿（DEB-10）；等在跑实例结束后 rerun" >&2
+            exit 1
+          fi
+          exit "$RC"
+
+
+  # ---- 批2 · A-22：PR 反馈面防弱化静态自检（F1 面作用域；R08–R16 L-18 未裁不外推） ----
+  workflow-hygiene:
+    name: "批2·A-22 PR 反馈面防弱化（结构规则子集 R01–R07/R12/R13/R15/R17/R19/R20/R21；F1 面作用域）"
+    if: ${{ inputs.hygiene_enable == 'true' }}
+    runs-on: ${{ inputs.g2_runs_on }}
+    timeout-minutes: 45
+    env:
+      CI_G2_SCOPE: ${{ inputs.g2_scope }}
+      CI_G2_CHECKOUT_URL: ${{ inputs.g2_checkout_url }}
+      CI_G2_CHECKOUT_REF: ${{ inputs.g2_checkout_ref }}
+      CI_G2_TRIAL_CONFIG: ${{ inputs.g2_trial_config }}
+      CI_G2_HYGIENE_DIR: ${{ inputs.hygiene_dir }}
+    steps:
+      - name: "批2·A-22 步1·判别力自证夹具（真绿必绿＋逐规则单点变异真红必红并点名）"
+        run: |
+          set -eu
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          mkdir -p "$G2DIR"
+          echo "批2·A-22 步1: 判别力自证（真绿 2＋真红 13，逐规则单点变异）"
+          cat > "$G2DIR/g2_hygiene.py" <<'G2_HYGIENE_PY'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          """g2_hygiene.py — A-22 PR 反馈面防弱化静态自检（org ci-gates.yml 第二批 · D-89）。
+
+          正本口径: af/ci/gh_workflow_check.py R01–R22（判据件本体零改动，本件是 org 级
+          独立移植面）。作用域（卡面明令）：R08–R16 覆盖面缺陷未收敛前（L-18 ADR 未裁）
+          以 F1 面为限——本件只检**PR 反馈面**（触发含 pull_request 的工作流文件）的结构
+          规则子集 R01–R07/R12/R13/R15/R17/R19/R20/R21；R08–R11/R14/R16/R18/R22 为 af 仓
+          F1 语义件口径（fmt/clippy/快速测试/工具链/自检 step 在位），未裁不外推（Q3 实跑
+          fail=7 教训：全面 workflow 即红；禁为装下新门放宽在册 R 规则——本件不改任何一条
+          在册规则语义，只按卡面收窄作用域）。
+
+          org 口径（与 af 最严口径的差异逐条登记，均不弱于第一批 selftest 口径）:
+            · R07 零外部 action：uses 只许本组织 CloudCrane-Software/ 前缀（第一批
+              selftest 同口径）；step 级 uses 一律红（零 action 形态，af R17 同款）。
+            · R12/R15/R17 对 workflow_call 委托作业（job 级 uses）豁免——委托作业的
+              timeout/runs-on/steps 判据由被委托 org 件本体自带（ci-gates.yml 每作业
+              timeout-minutes: 45；在册可机判）。
+            · R03 提权触发面对每件生效（不因非 PR 反馈面漏检）。
+
+          契约:
+            g2_hygiene.py check --dir D        检 D 下 *.yml/*.yaml 的 PR 反馈面
+            g2_hygiene.py selftest             内嵌夹具：真绿必绿 + 逐规则变异必红并点名
+          退出码: 0=绿（RECORDS=n 自报判定数）；1=红；2=用法/环境错。
+          零第三方依赖（PyYAML 在场则优先+重复键 fail-closed，缺席退内建子集解析器）；
+          python3 -I 直跑。
+          """
+
+          import os
+          import re
+          import sys
+
+          ORG_PREFIX = "CloudCrane-Software/"
+          # 被禁字面量以拼接构造（承第一批 selftest ABSORB_* 纪律：防本件对自身/夹具自指
+          # 误伤与上层整体面全文扫描的假阳）
+          PR_TARGET = "pull_request_" + "target"
+          SW_TRUE = "|| " + "true"
+          CR_LINE = "contents:" + " read"
+          CW_LINE = "contents: wr" + "ite"
+          CRED_PATTERNS = [
+              (re.compile(r"gh[pousr]_[A-Za-z0-9]{16,}"), "GitHub PAT 形态字面量"),
+              (re.compile(r"github_pat_[A-Za-z0-9_]{16,}"), "GitHub fine-grained PAT 形态字面量"),
+              (re.compile(r"AKIA[0-9A-Z]{16}"), "AWS AKIA 形态字面量"),
+              (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "私钥 PEM 头形态字面量"),
+              (re.compile(r"x-access-token:(?!\s*$)[A-Za-z0-9_\-]{8,}"), "内嵌 access token 字面量"),
+          ]
+          CRED_ENV_KEY = re.compile(r"(?i)(token|password|passwd|secret|api[_-]?key|credential)")
+          SWALLOW = [
+              (re.compile(r"\|\| *true\b"), SW_TRUE),
+              (re.compile(r"\|\| *:"), "|| :"),
+              (re.compile(r"; *true\b"), "; true"),
+              (re.compile(r"^\s*set *\+e\b"), "set +e"),
+          ]
+
+
+          # ---- 解析（PyYAML 优先 + 重复键 fail-closed；缺席退内建子集解析器） ----------
+          class _DupKeyLoader(dict):
+              """safe_load 基础上重复键即抛（解析歧义=fail-closed，af R02 同款）。"""
+
+              def __setitem__(self, key, val):
+                  if key in self:
+                      raise ValueError(f"重复键: {key}")
+                  super().__setitem__(key, val)
+
+
+          def _builtin_parse(text):
+              """内建 YAML 子集解析器（workflow 形态够用；解析不了=fail-closed）。
+              支持: 注释、块标量(|/>/-)、嵌套映射、序列、引号标量、重复键检测。"""
+              root = {}
+              stack = [(-1, root)]           # (indent, container)
+              dup = set()
+              lines = text.splitlines()
+              i, n = 0, len(lines)
+              block_until = None             # 块标量吞行态（父键缩进）
+              while i < n:
+                  raw = lines[i]
+                  i += 1
+                  if block_until is not None:
+                      if raw.strip() == "" or len(raw) - len(raw.lstrip(" ")) > block_until:
+                          continue
+                      block_until = None
+                  stripped = raw.strip()
+                  if stripped == "" or stripped.startswith("#"):
+                      continue
+                  indent = len(raw) - len(raw.lstrip(" "))
+                  if "\t" in raw[: len(raw) - len(raw.lstrip())]:
+                      raise ValueError(f"缩进含 TAB（L{i}）")
+                  eff = re.sub(r"(?<!['\"])\s#[^'\"]*$", "", raw).rstrip()
+                  # 先弹到本行归属层（同层兄弟 item dict / 更浅容器；序列项行同此规）
+                  while stack and indent <= stack[-1][0] and len(stack) > 1:
+                      stack.pop()
+                  # 序列项：归属层为列表 ⇒ 挂入列表（悬挂列表以 (indent-1) 入栈属正常态）
+                  m = re.match(r"^-\s+(.*)$", eff.strip())
+                  if m and isinstance(stack[-1][1], list):
+                      parent = stack[-1][1]
+                      body = m.group(1)
+                      km = re.match(r"^([^:]+):\s*(.*)$", body)
+                      if not km:
+                          parent.append(_scalar(body))
+                          continue
+                      key0, val0 = km.group(1).strip(), km.group(2).strip()
+                      # 向后看：本项后续存在更深行 ⇒ 本项是多键映射（如 "- name: x" + "run:"）
+                      j = i
+                      while j < n and (lines[j].strip() == "" or lines[j].strip().startswith("#")):
+                          j += 1
+                      deeper = j < n and (len(lines[j]) - len(lines[j].lstrip(" "))) > indent
+                      item = {}
+                      parent.append(item)
+                      if val0 in ("|", "|-", ">", ">-", "|+", "+"):
+                          item[key0] = "<<<BLOCK>>>"
+                          block_until = indent
+                      elif val0 == "":
+                          if deeper:
+                              stack.append((indent, item))
+                          else:
+                              item[key0] = None
+                      else:
+                          item[key0] = _scalar(val0)
+                          if deeper:
+                              stack.append((indent, item))
+                      continue
+                  # 键行：悬挂列表弹到映射层（键行永不落列表）
+                  while len(stack) > 1 and not isinstance(stack[-1][1], dict):
+                      stack.pop()
+                  parent = stack[-1][1]
+                  if not isinstance(parent, dict):
+                      parent = root
+                  km = re.match(r"^([^:]+):\s*(.*)$", eff)
+                  if not km:
+                      raise ValueError(f"行不可解析（L{i}）: {stripped[:60]}")
+                  key, val = km.group(1).strip().strip('"\''), km.group(2).strip()
+                  sig = (id(parent), key)
+                  if sig in dup:
+                      raise ValueError(f"重复键: {key}")
+                  dup.add(sig)
+                  if val in ("|", "|-", ">", ">-", "|+", "+"):
+                      parent[key] = "<<<BLOCK>>>"
+                      block_until = indent
+                      continue
+                  if val == "":
+                      child = None
+                      j = i
+                      while j < n and (lines[j].strip() == "" or lines[j].strip().startswith("#")):
+                          j += 1
+                      if j < n:
+                          nxt = lines[j]
+                          nindent = len(nxt) - len(nxt.lstrip(" "))
+                          if nindent > indent:
+                              child = []
+                              if not nxt.strip().startswith("- "):
+                                  child = {}
+                          elif nindent == indent and nxt.strip().startswith("- ") and isinstance(parent, dict) and stack and stack[-1][0] < indent:
+                              child = []
+                      if isinstance(child, dict):
+                          parent[key] = child
+                          stack.append((indent, child))
+                      elif isinstance(child, list):
+                          parent[key] = child
+                          stack.append((indent - 1, child))
+                      else:
+                          parent[key] = None
+                      continue
+                  parent[key] = _scalar(val)
+              return root
+
+
+          def _scalar(v):
+              v = v.strip()
+              if v.startswith("[") and v.endswith("]"):
+                  inner = v[1:-1].strip()
+                  return [_scalar(x) for x in inner.split(",")] if inner else []
+              if (v.startswith("'") and v.endswith("'")) or (v.startswith('"') and v.endswith('"')):
+                  return v[1:-1]
+              if v == "true":
+                  return True
+              if v == "false":
+                  return False
+              if v == "null" or v == "~":
+                  return None
+              try:
+                  return int(v)
+              except ValueError:
+                  return v
+
+
+          def parse_doc(text):
+              """返回 (doc, method, err)。PyYAML 优先（重复键 fail-closed）；缺席退内建。"""
+              try:
+                  import yaml
+              except ImportError:
+                  try:
+                      return _builtin_parse(text), "builtin-subset", None
+                  except ValueError as exc:
+                      return None, "builtin-subset", str(exc)
+              try:
+                  loader = yaml.SafeLoader
+
+                  def construct_mapping(loader_, node, deep=False):
+                      mapping = _DupKeyLoader()
+                      for k_node, v_node in node.value:
+                          key = loader_.construct_object(k_node, deep=deep)
+                          val = loader_.construct_object(v_node, deep=deep)
+                          mapping[key] = val
+                      return mapping
+                  loader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_mapping)
+                  return yaml.load(text, Loader=loader), "pyyaml+dupkey", None
+              except Exception as exc:
+                  # PyYAML 失败时用内建复断一次：内建也判不可解析才真红（双解析取交集防单解析器盲区；
+                  # 内建任何形式失手同样判解析失败——解析面 fail-closed，禁放行）
+                  try:
+                      _builtin_parse(text)
+                  except Exception:
+                      return None, "pyyaml+dupkey", str(exc)
+                  return {}, "pyyaml+dupkey", str(exc)
+
+
+          def no_comment(text):
+              out = []
+              for line in text.splitlines():
+                  s = line.strip()
+                  if s.startswith("#"):
+                      continue
+                  out.append(re.sub(r"(?<!['\"])\s#[^'\"]*$", "", line))
+              return "\n".join(out)
+
+
+          # ---- 规则面 -------------------------------------------------------------------
+          def check_file(rel, doc, text, report):
+              """返回本文件判定记录数；违规挂入 report（逐条 (rule, msg)）。"""
+              records = 0
+              trig = doc.get("on") if isinstance(doc, dict) else None
+              if trig is None and isinstance(doc, dict):
+                  trig = doc.get(True)  # PyYAML 1.1 裸 on=True
+              if not isinstance(trig, dict):
+                  report.append(("R02", f"{rel}: on: 触发面不可解析/缺席（结构面不可证）"))
+                  return records
+              eff = no_comment(text)
+
+              # R03 提权触发——对每件生效（PR_TARGET 单独作触发面=最危险提权面，
+              # 不许因「非 PR 反馈面」而漏检）
+              records += 1
+              if re.search(r"\b" + PR_TARGET + r"\b", eff):
+                  report.append(("R03", f"{rel}: 生效文本出现 {PR_TARGET}（提权触发面）"))
+
+              has_pr = "pull_request" in trig
+              if not has_pr:
+                  report.append(("FACE-OUT", f"{rel}: 触发面无 pull_request——非 PR 反馈面，按 F1 作用域跳过（R08–R16 未裁不外推）"))
+                  return records
+
+              # R02 语义面在 parse 已红；此处记判定
+              records += 1
+
+              # R04 base 分支约束 + R20 触发面不得收窄
+              records += 2
+              pr = trig.get("pull_request")
+              if isinstance(pr, dict):
+                  branches = pr.get("branches") or pr.get("branches-ignore")
+                  if not branches:
+                      report.append(("R04", f"{rel}: pull_request 缺 base 分支约束（branches/branches-ignore 缺席或空）"))
+                  for narrowed in ("types", "paths", "paths-ignore"):
+                      if narrowed in pr:
+                          report.append(("R20", f"{rel}: on.pull_request 带 {narrowed}（触发面收窄=削弱）"))
+              else:
+                  report.append(("R04", f"{rel}: pull_request 触发为标量/列表形态，无法携带 base 分支约束"))
+
+              # R05 权限只读
+              records += 1
+              perms = doc.get("permissions")
+              if not isinstance(perms, dict) or perms.get("contents") != "read":
+                  report.append(("R05", f"{rel}: 顶层 permissions 非 {CR_LINE}（实得 {perms!r}）"))
+              else:
+                  for scope, val in perms.items():
+                      if not (isinstance(val, str) and val.strip().lower() in ("read", "none")):
+                          report.append(("R05", f"{rel}: 顶层权限项 {scope}={val!r} 非 read/none"))
+
+              # R06 凭据面
+              records += 1
+              for m in sorted(set(re.findall(r"secrets\.([A-Za-z0-9_]+)", eff))):
+                  if m != "GITHUB_TOKEN":
+                      report.append(("R06", f"{rel}: 引用 secrets.{m}（只许自动注入 GITHUB_TOKEN）"))
+              for pat, label in CRED_PATTERNS:
+                  if pat.search(eff):
+                      report.append(("R06", f"{rel}: 出现 {label}（凭据禁落盘）"))
+              for m in re.finditer(r"^\s*([A-Za-z0-9_\-]+)\s*:\s*(.+)$", eff, re.M):
+                  key, val = m.group(1), m.group(2).strip().strip('"\'')
+                  if CRED_ENV_KEY.search(key) and ("${" + "{") not in val and val not in ("", "''", '""'):
+                      report.append(("R06", f"{rel}: 环境变量/键 {key} 疑似硬编码凭据字面量"))
+
+              # R07 零外部 action（uses 只许本组织；step 级 uses 一律红）
+              jobs = doc.get("jobs") or {}
+              records += 1
+              if not isinstance(jobs, dict) or not jobs:
+                  report.append(("R05", f"{rel}: jobs 缺席/空面"))
+                  jobs = {}
+              for ref in re.findall(r"^\s*(?:-\s+)?uses\s*:\s*(\S+)", eff, re.M):
+                  if not ref.startswith(ORG_PREFIX):
+                      report.append(("R07", f"{rel}: 外部 action:{ref}（零外部 action；uses 只许 {ORG_PREFIX}*）"))
+
+              # 逐 job 结构规则
+              for jn, job in sorted((jobs or {}).items()):
+                  if not isinstance(job, dict):
+                      report.append(("R02", f"{rel}: job {jn} 结构不可解析"))
+                      continue
+                  delegate = isinstance(job.get("uses"), str)  # workflow_call 委托作业
+                  cond = job.get("if")
+                  records += 1
+                  if (cond is False) or (isinstance(cond, str) and cond.strip().lower() in ("false", "0")):
+                      report.append(("R19", f"{rel} job[{jn}]: job 级 if: 恒假（整门被悄悄关掉）"))
+                  jperm = job.get("permissions")
+                  if isinstance(jperm, dict):
+                      records += 1
+                      for scope, val in jperm.items():
+                          if isinstance(val, str) and val.strip().lower() == "write":
+                              report.append(("R05", f"{rel} job[{jn}]: 权限 {scope}=write（只读面被写穿）"))
+                  if delegate:
+                      continue
+                  records += 2
+                  tm = job.get("timeout-minutes")
+                  if not isinstance(tm, int) or isinstance(tm, bool) or tm <= 0 or tm > 45:
+                      report.append(("R12", f"{rel} job[{jn}]: timeout-minutes 缺席/非正整数/>45（实得 {tm!r}）"))
+                  if not job.get("runs-on"):
+                      report.append(("R15", f"{rel} job[{jn}]: runs-on 缺席"))
+                  for step in job.get("steps") or []:
+                      if not isinstance(step, dict):
+                          report.append(("R17", f"{rel} job[{jn}]: step 结构不可解析"))
+                          continue
+                      records += 1
+                      if isinstance(step.get("uses"), str):
+                          report.append(("R07", f"{rel} job[{jn}]: step 级 uses:{step['uses']}（零 action 形态；R17）"))
+                      run = step.get("run")
+                      if not isinstance(run, str) or not run.strip():
+                          report.append(("R17", f"{rel} job[{jn}]: step 缺 run 体（零 action 形态要求每步有 run）"))
+                          continue
+                      records += 1
+                      for line in run.splitlines():
+                          line = line.strip()
+                          if line.startswith("#"):
+                              continue
+                          for pat, label in SWALLOW:
+                              if pat.search(line):
+                                  report.append(("R21", f"{rel} job[{jn}]: 吞红写法 {label}（命令失败被吞=硬门恒绿）"))
+              # R13 顶层并发
+              records += 1
+              cc = doc.get("concurrency")
+              if not (isinstance(cc, dict) and cc.get("group") and cc.get("cancel-in-progress") is True):
+                  report.append(("R13", f"{rel}: 顶层 concurrency（group+cancel-in-progress: true）缺席/形态不合"))
+              return records
+
+
+          def do_check(args):
+              face_dir = args["dir"]
+              if not os.path.isdir(face_dir):
+                  print(f"RED R01: 面缺席 {face_dir}（PR 反馈面在场不可证）")
+                  return 1
+              files = sorted(fn for fn in os.listdir(face_dir) if fn.endswith((".yml", ".yaml")))
+              if not files:
+                  print(f"RED R01: 面空 {face_dir}（G1 债不得再欠）")
+                  return 1
+              report, records, in_face = [], 0, 0
+              for fn in files:
+                  rel = os.path.join(face_dir, fn)
+                  with open(rel, encoding="utf-8") as fh:
+                      text = fh.read()
+                  try:
+                      doc, method, err = parse_doc(text)
+                      if err:
+                          raise ValueError(f"YAML 解析失败[{method}]（fail-closed）: {err[:120]}")
+                      records += check_file(rel, doc, text, report)
+                  except Exception as exc:
+                      report.append(("R02", f"{rel}: {exc}"))
+                      records += 1
+                      continue
+                  if not any(r[0] == "FACE-OUT" and r[1].startswith(rel) for r in report):
+                      in_face += 1
+              fails = [r for r in report if r[0] != "FACE-OUT"]
+              skipped = [r for r in report if r[0] == "FACE-OUT"]
+              if fails:
+                  print("A-22 PR 反馈面防弱化红（F1 面作用域）:")
+                  for rule, msg in fails:
+                      print(f"  RED [{rule}] {msg}")
+                  for _r, msg in skipped:
+                      print(f"  SKIP {msg}")
+                  return 1
+              print(f"RECORDS={records}")
+              for _r, msg in skipped:
+                  print(f"  SKIP {msg}")
+              print(f"A-22 绿: 面内 {len(files)} 件（PR 反馈面 {in_face} 件全过结构规则子集 "
+                    f"R01–R07/R12/R13/R15/R17/R19/R20/R21；R08–R16 作用域 L-18 未裁不外推）")
+              return 0
+
+
+          # ---- selftest（同一真绿模板逐规则单点变异必红；RT-E121） -----------------------
+          GREEN = """name: face-demo
+          on:
+            pull_request:
+              branches:
+                - main
+          permissions:
+            @@CR@@
+          concurrency:
+            group: demo-concurrency-group
+            cancel-in-progress: true
+          jobs:
+            demo:
+              runs-on: ubuntu-latest
+              timeout-minutes: 45
+              steps:
+                - name: 说一句
+                  run: |
+                    echo "hi"
+          """
+
+
+          def mut(text, old, new, count=1):
+              assert old in text, f"变异锚点未命中: {old[:40]}"
+              return text.replace(old, new, count)
+
+
+          GREEN = GREEN.replace("@@CR@@", CR_LINE)
+
+          FIXTURES = [
+              ("真绿·合规 PR 面", GREEN, 0, "RECORDS="),
+              ("真红·R02 解析坏件", mut(GREEN, "on:", "on:\t\n  bad:", 1), 1, "解析失败"),
+              ("真红·R03 提权触发", mut(GREEN, "  pull_request:\n", "  pull_request:\n  " + PR_TARGET + ":\n"), 1, PR_TARGET),
+              ("真红·R04 缺 base 约束", mut(GREEN, "    branches:\n      - main\n", ""), 1, "base 分支约束"),
+              ("真红·R05 权限写穿", mut(GREEN, "  " + CR_LINE, "  " + CW_LINE), 1, "R05"),
+              ("真红·R06 硬编码凭据", mut(GREEN, 'echo "hi"', 'echo "ghp_' + "A1b2C3d4E5f6G7h8I9j0K1l2" + '"'), 1, "PAT 形态字面量"),
+              ("真红·R07 外部 action", mut(GREEN, "      - name: 说一句", "      - name: 借手\n        uses: actions/checkout@v4\n      - name: 说一句"), 1, "外部 action"),
+              ("真红·R12 超时缺位", mut(GREEN, "    timeout-minutes: 45\n", ""), 1, "timeout-minutes"),
+              ("真红·R13 并发缺位", mut(GREEN, "concurrency:\n  group: demo-concurrency-group\n  cancel-in-progress: true\n", ""), 1, "concurrency"),
+              ("真红·R15 runner 缺位", mut(GREEN, "    runs-on: ubuntu-latest\n", ""), 1, "runs-on"),
+              ("真红·R17 step 缺 run 体", mut(GREEN, "      - name: 说一句\n        run: |\n          echo \"hi\"", "      - name: 只声明（仅 name 无 run 体）"), 1, "缺 run 体"),
+              ("真红·R19 job 恒假", mut(GREEN, "  demo:\n", "  demo:\n    if: false\n"), 1, "恒假"),
+              ("真红·R20 触发面收窄", mut(GREEN, "  pull_request:\n    branches:", "  pull_request:\n    types:\n      - opened\n    branches:"), 1, "types"),
+              ("真红·R21 吞红", mut(GREEN, 'echo "hi"', 'echo "hi" ' + SW_TRUE), 1, SW_TRUE),
+          ]
+
+          FACE_OUT = """name: not-face
+          on:
+            schedule:
+              - cron: '*/30 * * * *'
+          jobs:
+            tick:
+              runs-on: ubuntu-latest
+              steps:
+                - name: t
+                  run: echo tick
+          """
+
+
+          def subprocess_run(argv):
+              import subprocess
+              return subprocess.run(argv, capture_output=True, text=True)
+
+
+          def do_selftest():
+              import shutil
+              import tempfile
+              readings, fails = [], []
+              root = tempfile.mkdtemp(prefix="g2hyg-")
+              for idx, (name, content, want_rc, marker) in enumerate(FIXTURES):
+                  d = os.path.join(root, f"case-{idx:02d}", ".github", "workflows")
+                  os.makedirs(d, exist_ok=True)
+                  with open(os.path.join(d, "f.yml"), "w", encoding="utf-8") as fh:
+                      fh.write(content)
+                  argv = ["python3", "-I", os.path.abspath(sys.argv[0]), "check", "--dir", d]
+                  proc = subprocess_run(argv)
+                  ok = proc.returncode == want_rc and marker in proc.stdout
+                  readings.append(f"{name}: rc={proc.returncode} 期望={want_rc} 点名「{marker}」{' ✓' if ok else ' ✗<<<'}")
+                  if not ok:
+                      fails.append(name)
+                      readings.append("    输出: " + proc.stdout[:300].replace("\n", " | "))
+              # FACE-OUT 绿：非 PR 面文件按作用域跳过不红
+              d = os.path.join(root, "case-faceout", ".github", "workflows")
+              os.makedirs(d, exist_ok=True)
+              with open(os.path.join(d, "f.yml"), "w", encoding="utf-8") as fh:
+                  fh.write(GREEN)
+              with open(os.path.join(d, "cron.yml"), "w", encoding="utf-8") as fh:
+                  fh.write(FACE_OUT)
+              proc = subprocess_run(["python3", "-I", os.path.abspath(sys.argv[0]), "check", "--dir", d])
+              ok = proc.returncode == 0 and "跳过" in proc.stdout
+              readings.append(f"真绿·非 PR 面按作用域跳过: rc={proc.returncode} 期望=0 点名「跳过」{' ✓' if ok else ' ✗<<<'}")
+              if proc.returncode != 0:
+                  fails.append("真绿·非 PR 面按作用域跳过")
+                  readings.append("    输出: " + proc.stdout[:300].replace("\n", " | "))
+              # R01 面缺席/空
+              d = os.path.join(root, "case-empty", ".github", "workflows")
+              os.makedirs(d, exist_ok=True)
+              proc = subprocess_run(["python3", "-I", os.path.abspath(sys.argv[0]), "check", "--dir", d])
+              ok = proc.returncode == 1 and "R01" in proc.stdout
+              readings.append(f"真红·R01 面空: rc={proc.returncode} 期望=1 点名「R01」{' ✓' if ok else ' ✗<<<'}")
+              if not ok:
+                  fails.append("真红·R01 面空")
+              shutil.rmtree(root, ignore_errors=True)
+              print("—— A-22 selftest 夹具读数 ——")
+              for r in readings:
+                  print("  " + r)
+              if fails:
+                  print(f"A-22 selftest 红: {len(fails)} 夹具失守 -> {fails}")
+                  return 1
+              print("A-22 selftest 全绿 exit 0（真绿 2 必绿 + 真红 13 必红且点名，逐规则单点变异）")
+              return 0
+
+
+          def main(argv):
+              if len(argv) >= 2 and argv[1] == "selftest":
+                  return do_selftest()
+              if len(argv) >= 2 and argv[1] == "check":
+                  i = 2
+                  args = {"dir": ""}
+                  while i < len(argv):
+                      if argv[i] == "--dir" and i + 1 < len(argv):
+                          args["dir"] = argv[i + 1]
+                          i += 2
+                      else:
+                          print("usage 错", file=sys.stderr)
+                          return 2
+                  return do_check(args)
+              print("usage: g2_hygiene.py check --dir D | selftest", file=sys.stderr)
+              return 2
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          G2_HYGIENE_PY
+          python3 -I "$G2DIR/g2_hygiene.py" selftest
+      - name: "批2·A-22 步2·调用仓面（.github/workflows PR 反馈面；在册规则违例一律红）"
+        if: ${{ inputs.g2_scope != 'fixtures-only' }}
+        run: |
+          set -eu
+          # 检出面（可复用件跑在调用方工作区；匿名 clone 零 uses 形态）
+          if [ -n "$CI_G2_CHECKOUT_URL" ]; then
+            REF="${CI_G2_CHECKOUT_REF:-}"
+            attempt=0
+            until [ "$attempt" -ge 3 ]; do
+              if [ -n "$(ls -A . 2>/dev/null)" ]; then
+                find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+              fi
+              CLONE_OK=0
+              if printf '%s' "$REF" | grep -qE '^[0-9a-f]{40}$'; then
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then
+                  if git fetch --depth 1 origin "$REF" && git checkout --quiet --detach "$REF"; then
+                    CLONE_OK=1
+                  fi
+                fi
+              elif [ -n "$REF" ]; then
+                if git clone --depth 1 --branch "$REF" -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              else
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              fi
+              if [ "$CLONE_OK" = 1 ]; then break; fi
+              attempt=$((attempt + 1))
+              echo "批2 检出失败（第 $attempt/3 次）——5s 后重试" >&2
+              sleep 5
+            done
+            if [ "$attempt" -ge 3 ]; then
+              echo "RED 批2 检出面三次皆败（直连抖动/私仓未带凭据面）——fail-closed" >&2
+              exit 2
+            fi
+          elif [ -z "$(ls -A . 2>/dev/null)" ]; then
+            echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
+            exit 2
+          fi
+
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          [ -f "$G2DIR/g2_hygiene.py" ] || { echo "RED 判别机缺席（步1 未落 G2DIR=$G2DIR）——fail-closed" >&2; exit 2; }
+          echo "批2·A-22 步2: 调用仓面（面目录=$CI_G2_HYGIENE_DIR）"
+          python3 -I "$G2DIR/g2_hygiene.py" check --dir "$CI_G2_HYGIENE_DIR"
+
+
+  # ---- 批2 · A-17：安全编码硬规则 lint（只报不加；点选制） ----
+  secure-lint:
+    name: "批2·A-17 安全硬规则 lint（S1 密钥出域 0600／S2 realpath 前缀／S3 命名空间 fail-closed／S4 禁 stdout-only）"
+    if: ${{ inputs.secure_lint_enable == 'true' }}
+    runs-on: ${{ inputs.g2_runs_on }}
+    timeout-minutes: 45
+    env:
+      CI_G2_SCOPE: ${{ inputs.g2_scope }}
+      CI_G2_CHECKOUT_URL: ${{ inputs.g2_checkout_url }}
+      CI_G2_CHECKOUT_REF: ${{ inputs.g2_checkout_ref }}
+      CI_G2_TRIAL_CONFIG: ${{ inputs.g2_trial_config }}
+      CI_G2_LINT_PATHS: ${{ inputs.secure_lint_paths }}
+      CI_G2_LINT_ALLOWLIST: ${{ inputs.secure_lint_allowlist }}
+    steps:
+      - name: "批2·A-17 步1·判别力自证夹具（真绿必绿＋单点变异真红必红并点名）"
+        run: |
+          set -eu
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          mkdir -p "$G2DIR"
+          echo "批2·A-17 步1: 判别力自证（真绿 3＋真红 7）"
+          cat > "$G2DIR/g2_secure_lint.py" <<'G2_LINT_PY'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          """g2_secure_lint.py — A-17 安全编码硬规则 lint（org ci-gates.yml 第二批 · D-89，只报不加）。
+
+          判据来源: CI 研究面 L-15（A-17 安全编码硬规则 lint 四规则，卡面 w06-org-gates-batch2）:
+            S1 密钥出域 0600/独立 uid —— 向密钥形态文件（*token*/*secret*/*cred*/*.pem/*.key*
+               *apikey*）写盘必须同文件自带 0600 供给（chmod 600 / os.chmod 0o600 /
+               install -m 600 / umask 077 先行）；独立 uid 隔离面（setpriv/runuser/su -/nsjail）
+               作为 NOTE 只报（不可静态证伪，不判红）。
+            S2 realpath 前缀校验在写盘前 —— 向非常量路径（含 $ 展开）解包/拷贝归档
+               （tar -x/unzip/curl|tar）前必须已见 realpath 解析 + 前缀断言（case 或 == "$BASE"/*）。
+            S3 入口 fail-closed 命名空间门 —— unshare/nsenter/ip netns/setpriv/bwrap 命令位
+               禁吞红（管管空格真/分号真写法）且入口必须先行 set -eu/-e（隔离建立失败=立即红，
+               不静默继续）。
+            S4 禁 stdout-only 失败判据 —— 打印失败标记（FAIL/未过/违规）而全文无非零退出
+               原语（exit N>0 / sys.exit(N>0) / raise SystemExit(N>0) / return N>0）= 只用
+               stdout 报失败 = 门形同虚设，红。
+
+          卡面禁项对齐: A-17 lint 只报不加——本件不挂任何仓的硬门；仓经 inputs 点选自行启用
+          （点选制）。夹具真红必红/真绿必绿（RT-E121：每条红夹具=从真绿模板单点变异）。
+
+          契约:
+            g2_secure_lint.py check --paths "DIR [DIR...]" [--allowlist F]
+              豁免面行格式: rule|path|reason（reason 必填；rule ∈ S1..S4；path 为清单相对路径）
+            g2_secure_lint.py selftest
+          退出码: 0=绿（RECORDS=n 自报判定数）；1=红（逐条 rule|file|line 点名）；2=用法错。
+          零第三方依赖；python3 -I 直跑。
+          """
+
+          import os
+          import re
+          import sys
+
+          SECRET_NAME = re.compile(r"(?i)(token|secret|cred|\.pem$|\.key$|apikey|api_key)")
+          WRITE_REDIRECT = re.compile(r"(?:>{1,2}|<|tee\s+(?:-a\s+)?)\s*[\"']?(\$\{?[A-Za-z_][A-Za-z0-9_./}]*|/?[A-Za-z0-9_./-]+)")
+          FAIL_ECHO = re.compile(r"(?i)(echo|printf|print)[^;\n]*\b(FAIL|未过|违规)\b")
+          NS_CMDS = re.compile(r"^\s*(?:sudo\s+)?(unshare|nsenter|ip\s+netns|setpriv|bwrap)\b")
+          MIT_0600 = re.compile(r"(?i)(chmod\s+(?:-f\s+)?0?600|os\.chmod\([^)]*0o600|install\s+-m\s+600|umask\s+0?77)")
+          REALPATH_GUARD = re.compile(r"(?i)realpath\s+-?m?")
+          PREFIX_ASSERT = re.compile(r"(?i)(case\s+\S+\s+in|\[\[?\s*\"\$\w+\"?\s*==\s*\"\$\w+(/\*)?\"?\s*\]?\]|==\s*\"\$\w+/\*\")")
+          EXTRACT = re.compile(r"(tar\s+[^#\n]*-x|tar\s+[^#\n]*\s-x|unzip\b|curl[^|\n]*\|\s*tar\s)")
+          NONZERO_EXIT_BASH = re.compile(r"\bexit\s+(?:[1-9][0-9]*|\$\{?[A-Za-z_])")
+          NONZERO_EXIT_PY = re.compile(r"(sys\.exit\((?:[1-9])|raise\s+SystemExit\((?:[1-9])|return\s+(?:[1-9])\b)")
+          SWALLOW_DEMO = " || " + "true"
+
+
+          def effective_lines(text):
+              """生效行（剥注释行与行尾注释；保行号）。"""
+              out = []
+              for i, raw in enumerate(text.splitlines(), 1):
+                  s = raw.strip()
+                  if s.startswith("#"):
+                      continue
+                  eff = re.sub(r"(?<!['\"])\s#[^'\"]*$", "", raw)
+                  out.append((i, eff))
+              return out
+
+
+          def lint_sh(path, lines):
+              finds, notes, records = [], [], 0
+              text = "\n".join(l for _i, l in lines)
+
+              # S1 密钥出域 0600
+              records += 1
+              mitigated = bool(MIT_0600.search(text))
+              secret_writes = []
+              for i, l in lines:
+                  m = WRITE_REDIRECT.search(l)
+                  if m and SECRET_NAME.search(m.group(1)):
+                      secret_writes.append((i, l.strip()))
+                  if re.search(r"(?i)\b(install|cp|mv)\s+.*\s+[\"']?\S*(token|secret|cred|\.pem|\.key)", l):
+                      secret_writes.append((i, l.strip()))
+              if secret_writes and not mitigated:
+                  for i, l in secret_writes[:3]:
+                      finds.append(("S1", path, i, f"向密钥形态路径写盘无 0600 供给（{l[:60]}）"))
+              for i, l in secret_writes:
+                  notes.append((path, i, f"独立 uid 隔离面未检出（只报不判红）: {l[:50]}"))
+
+              # S2 realpath 前缀校验在写盘前
+              records += 1
+              if EXTRACT.search(text):
+                  pre = ""
+                  guarded = False
+                  for i, l in lines:
+                      if REALPATH_GUARD.search(l):
+                          pre += l + "\n"
+                      if PREFIX_ASSERT.search(l) and pre:
+                          guarded = True
+                      if EXTRACT.search(l) and re.search(r"\$", l):
+                          if not guarded:
+                              finds.append(("S2", path, i, f"向非常量路径解包/拷贝前无 realpath+前缀断言（{l.strip()[:60]}）"))
+                          guarded = False
+                          pre = ""
+
+              # S3 入口 fail-closed 命名空间门
+              records += 1
+              set_e_idx = None
+              for i, l in lines:
+                  if re.match(r"^\s*set\s+-[a-z]*e", l):
+                      set_e_idx = i
+                      break
+              for i, l in lines:
+                  m = NS_CMDS.match(l)
+                  if not m:
+                      continue
+                  if re.search(r"\|\|\s*(true|:)\b|;\s*true\b", l):
+                      finds.append(("S3", path, i, f"命名空间命令吞红（{l.strip()[:50]}）——隔离建立失败被吞"))
+                  if set_e_idx is None or i < set_e_idx:
+                      finds.append(("S3", path, i, "命名空间门先于 set -e（fail-closed 入口缺位：隔离失败不即红）"))
+                  break  # 只审第一处入口形态
+
+              # S4 禁 stdout-only 失败判据
+              records += 1
+              fail_prints = [i for i, l in lines if FAIL_ECHO.search(l)]
+              if fail_prints and not NONZERO_EXIT_BASH.search(text):
+                  finds.append(("S4", path, fail_prints[0], "打印失败标记但全文无非零退出原语（stdout-only 失败判据）"))
+              return finds, notes, records
+
+
+          def lint_py(path, lines):
+              finds, notes, records = [], [], 0
+              text = "\n".join(l for _i, l in lines)
+
+              # S1
+              records += 1
+              mitigated = "0o600" in text or "umask(0o077)" in text or "umask(0o77)" in text
+              secret_writes = []
+              for i, l in lines:
+                  m = re.search(r"open\(\s*[\"']?([^\"']+)[\"']?\s*,\s*[\"']w", l)
+                  if m and SECRET_NAME.search(m.group(1)):
+                      secret_writes.append((i, l.strip()))
+              if secret_writes and not mitigated:
+                  for i, l in secret_writes[:3]:
+                      finds.append(("S1", path, i, f"open(w) 密钥形态路径无 0o600 供给（{l[:60]}）"))
+              for i, l in secret_writes:
+                  notes.append((path, i, f"独立 uid 隔离面未检出（只报不判红）: {l[:50]}"))
+
+              # S2/S3 以 bash 形态为主（py 面 shell=True 归 S3 吞红检查）
+              records += 2
+              for i, l in lines:
+                  if re.search(r"shell\s*=\s*True", l) and re.search(r"\|\|\s*true", l):
+                      finds.append(("S3", path, i, "shell=True 命令吞红（fail-closed 缺位）"))
+
+              # S4
+              records += 1
+              fail_prints = [i for i, l in lines if FAIL_ECHO.search(l)]
+              if fail_prints and not NONZERO_EXIT_PY.search(text):
+                  finds.append(("S4", path, fail_prints[0], "print 失败标记但无非零退出原语（stdout-only 失败判据）"))
+              return finds, notes, records
+
+
+          def read_allowlist(path):
+              out = {}
+              if not path:
+                  return out
+              if not os.path.isfile(path):
+                  print(f"RED 豁免面缺席: {path}")
+                  sys.exit(1)
+              for i, raw in enumerate(open(path, encoding="utf-8"), 1):
+                  line = raw.split("#", 1)[0].strip()
+                  if not line:
+                      continue
+                  parts = [p.strip() for p in line.split("|")]
+                  if len(parts) != 3 or not all(parts):
+                      print(f"RED 豁免面行不可解析或缺 reason（L{i}）: {raw.strip()[:60]}")
+                      sys.exit(1)
+                  out[(parts[0], parts[1])] = parts[2]
+              return out
+
+
+          def do_check(args):
+              paths = [p for p in (args["paths"] or "").split() if p]
+              if not paths:
+                  print("RED 用法错: --paths 空（点选面缺席=无可 lint 面，禁默认全仓扫）")
+                  return 2
+              allow = read_allowlist(args["allowlist"])
+              targets = []
+              for p in paths:
+                  if os.path.isfile(p):
+                      targets.append(p)
+                  elif os.path.isdir(p):
+                      for root, _dirs, files in os.walk(p):
+                          if "/.git" in root or root.endswith("/.git"):
+                              continue
+                          for fn in files:
+                              if fn.endswith((".sh", ".bash", ".py")):
+                                  targets.append(os.path.join(root, fn))
+              targets = sorted(set(targets))
+              if not targets:
+                  print("RED 判定记录数=0=真空（扫面无脚本可 lint）——禁计绿（A-8 口径）")
+                  return 1
+              finds, notes, records = [], [], 0
+              for t in targets:
+                  with open(t, encoding="utf-8", errors="replace") as fh:
+                      lines = effective_lines(fh.read())
+                  if t.endswith(".py"):
+                      f, n, r = lint_py(t, lines)
+                  else:
+                      f, n, r = lint_sh(t, lines)
+                  records += r
+                  finds += f
+                  notes += n
+              kept = []
+              for rule, path, line, msg in finds:
+                  reason = allow.get((rule, os.path.relpath(path)))
+                  if reason is not None:
+                      notes.append((path, line, f"豁免在案[{rule}]: {reason}"))
+                      continue
+                  kept.append((rule, path, line, msg))
+              for p, i, msg in notes:
+                  print(f"  NOTE {p}:{i}: {msg}")
+              if kept:
+                  print("A-17 安全硬规则 lint 红（只报不加；点选仓自行处置）:")
+                  for rule, path, line, msg in kept:
+                      print(f"  RED [{rule}] {os.path.relpath(path)}:{line}: {msg}")
+                  return 1
+              print(f"RECORDS={records}")
+              print(f"A-17 绿: {len(targets)} 件 × 4 规则（S1 出域 0600 / S2 realpath 前缀 / S3 命名空间 fail-closed / S4 禁 stdout-only）零违例")
+              return 0
+
+
+          # ---- selftest（真绿模板 × 单点变异必红；RT-E121） ------------------------------
+          GREEN_SH = """#!/usr/bin/env bash
+          set -eu
+          umask 077
+          BASE="$(pwd)/stage"
+          DEST="$BASE/in"
+          mkdir -p "$DEST"
+          REAL="$(realpath -m "$DEST")"
+          case "$REAL" in "$BASE"/*) ;; *) echo "FAIL prefix" >&2; exit 2 ;; esac
+          STATE="$BASE/state"
+          mkdir -p "$STATE"
+          TOKEN_FILE="$STATE/agent.token"
+          cat > "$TOKEN_FILE" <<'TOK'
+          demo-material
+          TOK
+          chmod 600 "$TOKEN_FILE"
+          unshare -n bash -c 'ip link show lo'
+          echo "ok"
+          """
+
+          RED_TEMPLATES = [
+              ("真红·S1 密钥写盘无 0600",
+               lambda t: t.replace('chmod 600 "$TOKEN_FILE"\n', '').replace("umask 077\n", "")),
+              ("真红·S2 解包无 realpath 前缀断言",
+               lambda t: t.replace('REAL="$(realpath -m "$DEST")"\ncase "$REAL" in "$BASE"/*) ;; *) echo "FAIL prefix" >&2; exit 2 ;; esac\n', '')
+                                .replace('mkdir -p "$DEST"\n', 'mkdir -p "$DEST"\ntar -xzf pkg.tgz -C "$DEST"\n')),
+              ("真红·S3 命名空间吞红",
+               lambda t: t.replace("unshare -n bash -c 'ip link show lo'",
+                                   "unshare -n bash -c 'ip link show lo'" + SWALLOW_DEMO)),
+              ("真红·S3b 命名空间门先于 set -e（缺位）",
+               lambda t: t.replace("set -eu\n", "set -u\n")),
+              ("真红·S4 stdout-only 失败判据",
+               lambda t: t.replace('echo "ok"', 'echo "FAIL: guard red"').replace("exit 2", "exit 0")),
+          ]
+
+          GREEN_PY = """#!/usr/bin/env python3
+          import os
+          os.umask(0o077)
+          state = "stage/state"
+          os.makedirs(state, exist_ok=True)
+          p = os.path.join(state, "agent.token")
+          with open(p, "w") as fh:
+              fh.write("demo-material")
+          os.chmod(p, 0o600)
+          def main():
+              bad = True
+              if bad:
+                  print("FAIL: demo")
+                  return 2
+              return 0
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          """
+
+
+          def subprocess_run(argv):
+              import subprocess
+              return subprocess.run(argv, capture_output=True, text=True)
+
+
+          def do_selftest():
+              import shutil
+              import tempfile
+              root = tempfile.mkdtemp(prefix="g2lint-")
+              readings, fails = [], []
+
+              def write_case(idx, content, extra_files=None, fname="demo.sh"):
+                  d = os.path.join(root, f"case-{idx:02d}", "src")
+                  os.makedirs(d, exist_ok=True)
+                  with open(os.path.join(d, fname), "w", encoding="utf-8") as fh:
+                      fh.write(content)
+                  for rel, c in (extra_files or {}).items():
+                      with open(os.path.join(d, rel), "w", encoding="utf-8") as fh:
+                          fh.write(c)
+                  return d
+
+              def run(name, d, want_rc, marker, allow=None):
+                  argv = ["python3", "-I", os.path.abspath(sys.argv[0]), "check",
+                          "--paths", d]
+                  if allow:
+                      argv += ["--allowlist", allow]
+                  proc = subprocess_run(argv)
+                  ok = proc.returncode == want_rc and marker in proc.stdout
+                  readings.append(f"{name}: rc={proc.returncode} 期望={want_rc} 点名「{marker}」{' ✓' if ok else ' ✗<<<'}")
+                  if not ok:
+                      fails.append(name)
+                      readings.append("    输出: " + proc.stdout[:400].replace("\n", " | "))
+
+              d = write_case(0, GREEN_SH)
+              run("真绿·bash 四规则全合规", d, 0, "RECORDS=")
+              d = write_case(1, GREEN_PY, fname="demo.py")
+              run("真绿·python 密钥写盘+退出码合规", d, 0, "RECORDS=")
+              for idx, (name, mut_fn) in enumerate(RED_TEMPLATES, start=10):
+                  rule = name.split("·")[1].split(" ")[0]
+                  d = write_case(idx, mut_fn(GREEN_SH))
+                  expect_rule = "S3" if rule == "S3b" else rule
+                  run(name, d, 1, expect_rule)
+
+              # 豁免面：合规登记（带 reason）⇒ S1 红转豁免绿；缺 reason ⇒ 红
+              d = write_case(20, RED_TEMPLATES[0][1](GREEN_SH))
+              al = os.path.join(root, "allow-ok.list")
+              with open(al, "w", encoding="utf-8") as fh:
+                  fh.write("S1|" + os.path.relpath(os.path.join(d, "demo.sh")) + "|挂债号 D-89 演练豁免（复核到期复红）\n")
+              run("真绿·豁免面合规（rule|path|reason）", d, 0, "RECORDS=", allow=al)
+              al2 = os.path.join(root, "allow-bad.list")
+              with open(al2, "w", encoding="utf-8") as fh:
+                  fh.write("S1|" + os.path.relpath(os.path.join(d, "demo.sh")) + "|\n")
+              run("真红·豁免缺 reason", d, 1, "reason", allow=al2)
+
+              # 真空防护：扫面无脚本 = 红不计绿
+              d = write_case(21, "")
+              os.remove(os.path.join(d, "demo.sh"))
+              with open(os.path.join(d, "readme.md"), "w", encoding="utf-8") as fh:
+                  fh.write("no scripts here\n")
+              run("真红·扫面真空（无脚本）", d, 1, "真空")
+
+              shutil.rmtree(root, ignore_errors=True)
+              print("—— A-17 selftest 夹具读数 ——")
+              for r in readings:
+                  print("  " + r)
+              if fails:
+                  print(f"A-17 selftest 红: {len(fails)} 夹具失守 -> {fails}")
+                  return 1
+              print("A-17 selftest 全绿 exit 0（真绿 3 必绿 + 真红 7 必红且点名）")
+              return 0
+
+
+          def main(argv):
+              if len(argv) >= 2 and argv[1] == "selftest":
+                  return do_selftest()
+              if len(argv) >= 2 and argv[1] == "check":
+                  args = {"paths": "", "allowlist": ""}
+                  i = 2
+                  while i < len(argv):
+                      key = argv[i].lstrip("-")
+                      if key in ("paths", "allowlist") and i + 1 < len(argv):
+                          args[key] = argv[i + 1]
+                          i += 2
+                      else:
+                          print("usage 错", file=sys.stderr)
+                          return 2
+                  return do_check(args)
+              print("usage: g2_secure_lint.py check --paths \"DIR...\" [--allowlist F] | selftest", file=sys.stderr)
+              return 2
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          G2_LINT_PY
+          python3 -I "$G2DIR/g2_secure_lint.py" selftest
+      - name: "批2·A-17 步2·调用仓面（点选扫面＋豁免面；违例逐条 rule|file|line 点名）"
+        if: ${{ inputs.g2_scope != 'fixtures-only' }}
+        run: |
+          set -eu
+          # 检出面（可复用件跑在调用方工作区；匿名 clone 零 uses 形态）
+          if [ -n "$CI_G2_CHECKOUT_URL" ]; then
+            REF="${CI_G2_CHECKOUT_REF:-}"
+            attempt=0
+            until [ "$attempt" -ge 3 ]; do
+              if [ -n "$(ls -A . 2>/dev/null)" ]; then
+                find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+              fi
+              CLONE_OK=0
+              if printf '%s' "$REF" | grep -qE '^[0-9a-f]{40}$'; then
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then
+                  if git fetch --depth 1 origin "$REF" && git checkout --quiet --detach "$REF"; then
+                    CLONE_OK=1
+                  fi
+                fi
+              elif [ -n "$REF" ]; then
+                if git clone --depth 1 --branch "$REF" -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              else
+                if git clone --depth 1 -- "$CI_G2_CHECKOUT_URL" .; then CLONE_OK=1; fi
+              fi
+              if [ "$CLONE_OK" = 1 ]; then break; fi
+              attempt=$((attempt + 1))
+              echo "批2 检出失败（第 $attempt/3 次）——5s 后重试" >&2
+              sleep 5
+            done
+            if [ "$attempt" -ge 3 ]; then
+              echo "RED 批2 检出面三次皆败（直连抖动/私仓未带凭据面）——fail-closed" >&2
+              exit 2
+            fi
+          elif [ -z "$(ls -A . 2>/dev/null)" ]; then
+            echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
+            exit 2
+          fi
+
+          G2BASE="${RUNNER_TEMP}"
+          [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
+          G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
+          [ -f "$G2DIR/g2_secure_lint.py" ] || { echo "RED 判别机缺席（步1 未落 G2DIR=$G2DIR）——fail-closed" >&2; exit 2; }
+          if [ -z "$CI_G2_LINT_PATHS" ]; then
+            echo "RED secure_lint_paths 缺参——扫面必须显式点选（禁默认全仓扫）" >&2
+            exit 1
+          fi
+          ALLOW_ARGS=""
+          if [ -n "${CI_G2_LINT_ALLOWLIST:-}" ]; then
+            ALLOW_ARGS="--allowlist ${CI_G2_LINT_ALLOWLIST:-}"
+          fi
+          echo "批2·A-17 步2: 调用仓面（扫面=$CI_G2_LINT_PATHS）"
+          python3 -I "$G2DIR/g2_secure_lint.py" check \
+            --paths "$CI_G2_LINT_PATHS" $ALLOW_ARGS
