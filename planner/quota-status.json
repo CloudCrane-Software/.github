@@ -1,13 +1,13 @@
 {
   "schema": "af.model-quota-hold.v2",
   "source": "状态/模型配额停用-20261105.json（workflow_model_policy 段 · 运营者 2026-11-06 裁定）实读提炼",
-  "updated_at": "2026-11-06T18:11:35+0800",
+  "updated_at": "2026-11-06T23:55:00+0800",
   "hold_until": "2026-11-06T18:00:00+0800",
   "calls_this_hour": 0,
   "workflow_model_policy": {
-    "ruling": "运营者 2026-11-06：全面放开 individual plan GLM-5.3-Flash，未来工作流子代理一律用 GLM-5.3-Flash",
-    "rank1": "account:bigmodel-individual-coding-plan/GLM-5.3-Flash",
-    "fallback": "new-provider/step-5-preview",
+    "ruling": "运营者 2026-11-06：全面放开 individual plan GLM-5.3-Flash，未来工作流子代理一律用 GLM-5.3-Flash；2026-11-06 夜间补充裁定：规划环(planner) LLM 切基元律动 TokenRhythm deepseek-v4.1-flash-1017（工作流子代理仍 GLM-5.3-Flash）",
+    "rank1": "tokenrhythm/deepseek-v4.1-flash-1017",
+    "fallback": "account:bigmodel-individual-coding-plan/GLM-5.3-Flash",
     "applies_to": [
       "工作流子代理",
       "规划环(planner) LLM 调用",
@@ -17,24 +17,30 @@
   "priority": [
     {
       "rank": 1,
-      "provider_id": "account:bigmodel-individual-coding-plan",
-      "model_id": "GLM-5.3-Flash",
-      "note": "唯一主通道（运营者裁定，见 workflow_model_policy 段）；bigmodel individual coding plan，OpenAI 兼容端点 open.bigmodel.cn/api/coding/paas/v4；周限滚动重置，无 key 到期日记录"
+      "provider_id": "tokenrhythm",
+      "model_id": "deepseek-v4.1-flash-1017",
+      "note": "planner 主通道（运营者 2026-11-06 夜间指令：可用基元律动 key 调 deepseek v4.1 1017）；OpenAI 兼容 https://tokenrhythm.studio/v1；切因=GLM 高峰期 M-1 形制漂移 4/5 败、deepseek 探针 3/3 守约 2.5-3.6s；key 源 openBao company/LLM-upstream/TokenRhythm-neohorse（repo secret LLM_API_KEY 同步换值）"
     },
     {
       "rank": 2,
+      "provider_id": "account:bigmodel-individual-coding-plan",
+      "model_id": "GLM-5.3-Flash",
+      "note": "前 planner 主通道降 fallback：2026-11-06 14:40-15:20Z 高峰期 manifest M-1 形制漂移 4/5 败（issue 见 factory-os planner run 历史）；切回需同步 planner.yml env 与 secret"
+    },
+    {
+      "rank": 4,
       "provider_id": "new-provider",
       "model_id": "step-5-preview",
       "note": "fallback 通道；key 2026-12-05 20:00 过期前可用（切回需同步改 planner.yml LLM_BASE_URL/LLM_MODEL 与 secret）"
     },
     {
-      "rank": 3,
+      "rank": 5,
       "provider_id": "x-ai",
       "model_id": "grok-4.6",
       "note": "anolis 兜底。"
     },
     {
-      "rank": 4,
+      "rank": 6,
       "provider_id": "(运营者支援)",
       "model_id": "(别的 plan 额度)",
       "note": "动用前必须明确说。"
