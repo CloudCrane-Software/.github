@@ -1093,47 +1093,15 @@ jobs:
           # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
           # 只填显式入参留空的键——显式入参优先）
           if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
-            for G2K in CI_G2_LINT_PATHS CI_G2_LINT_ALLOWLIST; do
-              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
-              [ -n "$G2CUR" ] && continue
-              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
-              [ -n "$G2V" ] && eval "export $G2K="$G2V""
-            done
-            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
-          fi
-          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
-          # 只填显式入参留空的键——显式入参优先）
-          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
-            for G2K in CI_G2_HYGIENE_DIR; do
-              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
-              [ -n "$G2CUR" ] && continue
-              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
-              [ -n "$G2V" ] && eval "export $G2K="$G2V""
-            done
-            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
-          fi
-          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
-          # 只填显式入参留空的键——显式入参优先）
-          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
-            for G2K in CI_G2_SCALE_CMD CI_G2_RODS CI_G2_MARGIN CI_G2_FLOOR_MS; do
-              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
-              [ -n "$G2CUR" ] && continue
-              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
-              [ -n "$G2V" ] && eval "export $G2K="$G2V""
-            done
-            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
-          fi
-          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
-          # 只填显式入参留空的键——显式入参优先）
-          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
             for G2K in CI_G2_PIN_LIST CI_G2_PIN_VALUES CI_G2_PIN_SCAN_DIR CI_G2_PIN_SCAN_EXTS CI_G2_PIN_EXCLUSIONS; do
-              G2CUR="$(eval "printf '%s' "\${$G2K:-}"")"
+              G2CUR="$(eval "printf '%s' \"\${$G2K:-}\"")"
               [ -n "$G2CUR" ] && continue
               G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
-              [ -n "$G2V" ] && eval "export $G2K="$G2V""
+              [ -n "$G2V" ] && eval "export $G2K=\"$G2V\""
             done
             echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
           fi
+
           G2BASE="${RUNNER_TEMP}"
           [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
           G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
@@ -1472,6 +1440,18 @@ jobs:
           elif [ -z "$(ls -A . 2>/dev/null)" ]; then
             echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
             exit 2
+          fi
+
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
+          # 只填显式入参留空的键——显式入参优先）
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G2K in CI_G2_SCALE_CMD CI_G2_RODS CI_G2_MARGIN CI_G2_FLOOR_MS; do
+              G2CUR="$(eval "printf '%s' \"\${$G2K:-}\"")"
+              [ -n "$G2CUR" ] && continue
+              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G2V" ] && eval "export $G2K=\"$G2V\""
+            done
+            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
           fi
 
           G2BASE="${RUNNER_TEMP}"
@@ -2095,6 +2075,18 @@ jobs:
             exit 2
           fi
 
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
+          # 只填显式入参留空的键——显式入参优先）
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G2K in CI_G2_HYGIENE_DIR; do
+              G2CUR="$(eval "printf '%s' \"\${$G2K:-}\"")"
+              [ -n "$G2CUR" ] && continue
+              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G2V" ] && eval "export $G2K=\"$G2V\""
+            done
+            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
+          fi
+
           G2BASE="${RUNNER_TEMP}"
           [ -n "$G2BASE" ] || G2BASE="${HOME:-/tmp}"
           G2DIR="$G2BASE/.ci-gates-g2/${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}"
@@ -2533,6 +2525,18 @@ jobs:
           elif [ -z "$(ls -A . 2>/dev/null)" ]; then
             echo "RED 调用仓面缺席（g2_checkout_url 未传且工作区空）——可复用件跑在调用方工作区契约 fail-closed" >&2
             exit 2
+          fi
+
+          # 试跑配置面（dispatch 面入参 ≤10 硬限的补全：KEY=VALUE 行，键=CI_G2_* 同名；
+          # 只填显式入参留空的键——显式入参优先）
+          if [ -n "${CI_G2_TRIAL_CONFIG:-}" ] && [ -f "$CI_G2_TRIAL_CONFIG" ]; then
+            for G2K in CI_G2_LINT_PATHS CI_G2_LINT_ALLOWLIST; do
+              G2CUR="$(eval "printf '%s' \"\${$G2K:-}\"")"
+              [ -n "$G2CUR" ] && continue
+              G2V="$(grep -m1 "^$G2K=" "$CI_G2_TRIAL_CONFIG" | cut -d= -f2-)"
+              [ -n "$G2V" ] && eval "export $G2K=\"$G2V\""
+            done
+            echo "批2 试跑配置已载入: $CI_G2_TRIAL_CONFIG"
           fi
 
           G2BASE="${RUNNER_TEMP}"
