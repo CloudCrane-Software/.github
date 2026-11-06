@@ -1,0 +1,291 @@
+# =============================================================================
+# gates.yml — CloudCrane-Software/.github 可复用验收工作流（org 治理面正本）
+#
+# 定位（30-工件/GitHub协作平面-建设方案/01-建设方案.md §三「验收面」）：
+#   所有产品仓的 PR 经 `uses: CloudCrane-Software/.github/.github/workflows/
+#   gates.yml@main` 继承同一套门——本地验收耦合就此断开（CH 类门在 runner 上
+#   经 secret 跑）。本件是 af 仓 F2 全量门的 GitHub Actions 形态：作业链
+#   fmt → clippy → strategies_check → test → 专项门。
+#
+# ★ 容器作业隔离留待 P2（01-建设方案.md §三 / §五 P2）：runner 宿主暂不直跑
+#   untrusted PR 码——P2 之前仅厂内可信分支进门（工人 App 推同仓分支 +
+#   CODEOWNERS 保护规则兜底；fork PR 不给 secret）。P2 落地项：anolis 注册
+#   令牌、容器作业隔离、secret 卫生（fork 不给）、预检 wrapper 复用
+#   /data/bench/anolis-env-check.sh（磁盘 <20G fail-closed）。
+#
+# 命令正本（逐条实读，禁凭空编造）：
+#   · fmt            —— af/ci/run.sh:219-220（cargo fmt --check --all + k5-path-lint）
+#   · clippy         —— af/ci/run.sh:224-225（cargo clippy ... + clippy_gate.py 基线门）
+#   · strategies_check—— af/ci/run.sh:658（python3 -B ci/strategies_check.py）
+#   · test           —— af/ci/run.sh:248-255（provenance ensure/record + cargo test -j4 --workspace）
+#   · 专项门 ledger/anchor/otel —— tools/all-gates.sh:919-969/940/1097-1100/1230-1239
+#     （逐命令见下各 step 注释里的 add_item 行号）
+#
+# 形态纪律（对齐 af/ci/gh_workflow_check.py 判面与 af/.gitea/workflows/f1.yml）：
+#   · 零外部 action（R07）：checkout 由调用方 workflow 负责——可复用工作流的
+#     step 跑在调用方 run 的工作区里，调用方必须先 checkout 再 `uses:` 本件。
+#     工具链供给沿用 f1.yml「按仓内 rust-toolchain.toml 钉住 channel 自举」段。
+#   · 触发面纪律归调用方（R03/R04）：调用方只许 on: pull_request 且带 base
+#     分支约束，禁 pull_request_target（base 仓上下文跑不可信 PR 代码）。
+#   · 超时止损（R12）：每作业 timeout-minutes ≤ 45。
+#   · 诊断取舍：本件是 needs 作业链，一环红后继不跑——这是 PR 分钟级反馈的
+#     取舍，与 af/ci/run.sh「步骤失败不中断、一次拿全量诊断」哲学刻意不同；
+#     作业内多步骤（专项门三家族）用分段执行一次收全，不设 if: 抑制。
+#   · 分支保护接线（01-建设方案.md §五 P1「required check gates」）：GitHub
+#     required check 以作业名粒度挂载，链式门建议 fmt/clippy/strategies_check/
+#     test/special-gates 五个作业全挂，缺任一即未验。
+#
+# cargo 环境纪律（01-建设方案.md §三）：cargo 步骤必须
+#   env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy LC_CTYPE=C.UTF-8
+# 代理凭据永不进测试环境。
+# =============================================================================
+name: gates
+
+on:
+  workflow_call:
+    inputs:
+      special_gates:
+        description: "专项门点选（逗号分隔子集：ledger / anchor / otel；空=不跑）。判据见调用卡面「专项门」字段。"
+        required: false
+        default: ""
+        type: string
+
+# 权限最小化（R05）：全链只读。写面（建 Issue/commit manifest/auto-merge）走
+# 规划环的 GITHUB_TOKEN，不在本验收面。
+permissions:
+  contents: read
+
+# 并发策略（R13，同 f1.yml 形态）：同一 ref 重复推送只保最新一次验收。
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- 作业 1：fmt ----------------------------------------------------------
+  # 命令正本：af/ci/run.sh:219-220
+  #   step 1 "cargo fmt --check + K5 判分链路径 lint" --
+  #     bash -c "cd '$AF_ROOT' && cargo fmt --check --all && python3 ci/k5-path-lint.py"
+  # K5 判分链路径 lint 黑名单 = 判分链三件 + obs-checker + obs.rs，逐件 sha256
+  # 对表锚核对（af/ci/k5-path-lint.py 头注；判据正本 ci/scorechain-manifest.txt）。
+  fmt:
+    runs-on: [anolis-heavy]
+    timeout-minutes: 45
+    steps:
+      - name: 分工声明（F2 全量门上 runner；本地 ZCode 不再验收耦合）
+        run: |
+          echo "gates.yml 可复用验收工作流：fmt → clippy → strategies_check → test → 专项门"
+          echo "runner label: anolis-heavy（自托管；anolis）｜容器作业隔离：P2 留待项"
+
+      - name: 工具链供给（runner 容器无 rust——按仓内钉住版自举；已装则复用）
+        # 形态对齐 af/.gitea/workflows/f1.yml「工具链供给」步：读仓内
+        # rust-toolchain.toml 的 channel（af 仓现钉 1.99.1）装工具链 +
+        # rustfmt/clippy 组件（af/ci/run.sh step0 同款：rustup component add）。
+        # 注：本步是网络自举（curl/rustup 可能经代理出网）——刻意**不**剥代理；
+        # env -u 代理剥离只加在 cargo 语义步（构建/测试环境零代理凭据，§三 纪律）。
+        run: |
+          set -eu
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if command -v cargo >/dev/null 2>&1; then
+            echo "cargo 已在（复用既有供给）: $(cargo --version)"
+          else
+            echo "runner 容器无 rust——rustup 自举"
+            curl -sSfL https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init -o /tmp/rustup-init
+            chmod +x /tmp/rustup-init
+            /tmp/rustup-init -y --profile minimal --no-modify-path
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+          CHANNEL="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
+          echo "钉住 channel: $CHANNEL"
+          rustup toolchain install "$CHANNEL" --profile minimal --component rustfmt --component clippy 2>&1 | tail -5
+          rustup default "$CHANNEL"
+          cargo --version && rustc --version && cargo fmt --version
+
+      - name: fmt --check + K5 判分链路径 lint（硬门）
+        run: |
+          set -eu
+          export PATH="$HOME/.cargo/bin:$PATH"
+          env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy LC_CTYPE=C.UTF-8 \
+            cargo fmt --check --all
+          python3 ci/k5-path-lint.py
+
+  # ---- 作业 2：clippy -------------------------------------------------------
+  # 命令正本：af/ci/run.sh:224-225
+  #   step 2 "cargo clippy + clippy_gate" --
+  #     bash -c "cd '$AF_ROOT' && cargo clippy --workspace --all-targets -j4 \
+  #       --message-format=json > ci/out/step2-clippy.jsonl 2>/dev/null; rc=\$?; \
+  #       [ \$rc -ne 0 ] && exit \$rc; python3 ci/clippy_gate.py ci/out/step2-clippy.jsonl"
+  # 口径说明：本件是 F2 全量门面，clippy 用基线门（只拦新增警告；判据正本
+  # ci/clippy-baseline.txt，改基线须 clippy_gate --update 同批 gate_inputs_check
+  # update 重钉）。快速门 F1 的更严形态（cargo clippy --workspace --all-targets
+  # -- -D warnings）属 af/.gitea/workflows/f1.yml，两门分工不互相替代。
+  clippy:
+    needs: fmt
+    runs-on: [anolis-heavy]
+    timeout-minutes: 45
+    steps:
+      - name: clippy + 警告基线门（硬门：只拦新增警告）
+        run: |
+          set -u
+          export PATH="$HOME/.cargo/bin:$PATH"
+          mkdir -p ci/out
+          env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy LC_CTYPE=C.UTF-8 \
+            cargo clippy --workspace --all-targets -j4 --message-format=json > ci/out/step2-clippy.jsonl 2>/dev/null
+          rc=$?
+          [ $rc -ne 0 ] && exit $rc
+          python3 ci/clippy_gate.py ci/out/step2-clippy.jsonl
+
+  # ---- 作业 3：strategies_check ---------------------------------------------
+  # 命令正本：af/ci/run.sh:658（step14d）
+  #   (cd "$AF_ROOT" && python3 -B ci/strategies_check.py)
+  # 以 python3 -B 调用——pyc-shadow 纪律：不在 ci/ 留 __pycache__
+  # （af/ci/run.sh:604 头注）。本门校验 strategies/ 共识策略库 schema +
+  # 并集 index 完备性/登记值计数对账 + af-dsl 装载测试编译断言。
+  strategies_check:
+    needs: clippy
+    runs-on: [anolis-heavy]
+    timeout-minutes: 45
+    steps:
+      - name: strategies/ 策略库全量校验（硬门）
+        run: |
+          set -eu
+          export PATH="$HOME/.cargo/bin:$PATH"
+          python3 -B ci/strategies_check.py
+
+  # ---- 作业 4：test ---------------------------------------------------------
+  # 命令正本：af/ci/run.sh:248-255（step3）
+  #   provenance 门（pre-step，判脏即清）→ cargo test -j4 --workspace →
+  #   provenance record 三要素落 ci/out/step3-provenance.json。
+  #   W3-C-25 教训：共享 CARGO_TARGET_DIR 跨工作树会致 cargo test 原样执行
+  #   另一棵树构建的测试二进制并报 exit 0（假绿）——故测试前后必须过
+  #   ci/provenance_check.sh 的 ensure/record 两段，语义与 ci/run.sh step3 一致。
+  test:
+    needs: strategies_check
+    runs-on: [anolis-heavy]
+    timeout-minutes: 45
+    steps:
+      - name: provenance 门 + cargo test -j4 --workspace（硬门）
+        run: |
+          set -u
+          export PATH="$HOME/.cargo/bin:$PATH"
+          bash ci/provenance_check.sh ensure --root "$PWD"
+          pvc=$?
+          [ $pvc -ne 0 ] && exit $pvc
+          env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy LC_CTYPE=C.UTF-8 \
+            cargo test -j4 --workspace
+          rc=$?
+          bash ci/provenance_check.sh record --root "$PWD" \
+            --out ci/out/step3-provenance.json --test-log ci/out/step3.log \
+            >> ci/out/step3-provenance-record.log 2>&1 || true
+          exit $rc
+
+  # ---- 作业 5：专项门（inputs 点选） -----------------------------------------
+  # 命令正本：tools/all-gates.sh 的 L3 add_item 行（逐条见下）。
+  # ★ 适用面：ledger/anchor/otel 三门族判据件随 factory-os 仓的 tools/ 面走
+  #   （01-建设方案.md §一：factory-os = 工厂 OS 本体，tools/ 门禁脚本在役件）。
+  #   af 产品仓无 tools/ 面，其卡面专项门默认留空（点选即按下方缺件判红）。
+  # ★ 缺件纪律：点选而门件不在位 = 显式红（对齐 tools/all-gates.sh 头注
+  #   「门本体缺失……摘门必须显式红出来对账，不得静默放行」）——选而不跑
+  #   即「摘门保牌」形态，禁止。
+  # ★ 点选值经 env 传入（不直接插值进 shell）：SPECIAL_GATES 由调用卡面
+  #   「专项门」字段给出，逗号分隔子集 {ledger,anchor,otel}。
+  special-gates:
+    needs: test
+    runs-on: [anolis-heavy]
+    timeout-minutes: 45
+    env:
+      SPECIAL_GATES: ${{ inputs.special_gates }}
+    steps:
+      - name: 专项门点选解析与缺件预检（fail-closed）
+        run: |
+          set -eu
+          SEL="$(printf '%s' "${SPECIAL_GATES:-}" | tr -d ' ')"
+          want() { case ",$SEL," in *",$1,"*) return 0;; *) return 1;; esac; }
+          want ledger && LEDGER=1 || LEDGER=0
+          want anchor && ANCHOR=1 || ANCHOR=0
+          want otel   && OTEL=1   || OTEL=0
+          echo "点选: ledger=$LEDGER anchor=$ANCHOR otel=$OTEL（原始值: ${SPECIAL_GATES:-<空>}）"
+          fail=0
+          if [ "$LEDGER" = 1 ]; then
+            for f in tools/ledger-growth-gate.py tools/ledger-close-draft.py tools/ledger-greenclaim-recon-gate.py; do
+              [ -f "$f" ] || { echo "点选 ledger 但缺门件 $f——摘门保牌形态，判红" >&2; fail=1; }
+            done
+          fi
+          if [ "$ANCHOR" = 1 ]; then
+            for f in tools/anchor-inbatch-gate.py tools/anchor-uncheck-zero-gate.py 计划/研究组/方法论批-20261031/anchor-check.py; do
+              [ -f "$f" ] || { echo "点选 anchor 但缺门件 $f——摘门保牌形态，判红" >&2; fail=1; }
+            done
+          fi
+          if [ "$OTEL" = 1 ]; then
+            for f in tools/otel/otel-reconcile-probe.py tools/otel/otlp-assert.py tools/otel/ch-mes-reconcile.py; do
+              [ -f "$f" ] || { echo "点选 otel 但缺门件 $f——摘门保牌形态，判红" >&2; fail=1; }
+            done
+          fi
+          [ $fail -eq 0 ] || exit 1
+
+      # ledger 门族——命令正本 tools/all-gates.sh:967-969（止增门实扫 + 判别力
+      # 自测 + 收卷草案生成器自证）与 :1231（账本绿声称对账门）：
+      #   add_item L3 "ledger-growth-gate（止增门·基线后新增逃逸台账条目实扫）" \
+      #     "python3 '$TOOLS/ledger-growth-gate.py'"
+      #   add_item L3 "ledger-growth-gate --selftest（止增门判别力负向自测）" \
+      #     "python3 '$TOOLS/ledger-growth-gate.py' --selftest"
+      #   add_item L3 "ledger-close-draft --selftest（收卷草案生成器判别力自证）" \
+      #     "python3 '$TOOLS/ledger-close-draft.py' --selftest"
+      #   add_item L3 "ledger-greenclaim-recon-gate（账本绿声称对账门·B1）" \
+      #     "python3 '$TOOLS/ledger-greenclaim-recon-gate.py'"
+      # 注：close-draft 只接 --selftest——其无参 exit 1 = 有草案行（收卷时
+      # 正常态），接无参实跑会与止增门/迁移门对同一 id 重复点名（all-gates.sh:957-962）。
+      - name: 专项门 · ledger（止增门实扫+自测 / 收卷草案自证 / 绿声称对账）
+        if: ${{ contains(inputs.special_gates, 'ledger') }}
+        run: |
+          set -eu
+          python3 tools/ledger-growth-gate.py
+          python3 tools/ledger-growth-gate.py --selftest
+          python3 tools/ledger-close-draft.py --selftest
+          python3 tools/ledger-greenclaim-recon-gate.py
+
+      # anchor 门族——命令正本 tools/all-gates.sh:1230（锚批内同批回填纪律门）、
+      # :1239（E92 处置正本口径「未核=0」门，python3 -I 调用）与 :940
+      # （方法论 anchor-check 常驻门：方法论文档全部 文件:行/commit 锚点机检，
+      #  锚点漂移即时红）：
+      #   add_item L3 "anchor-inbatch-gate（锚批内同批回填纪律门·B5/C5+E92族）" \
+      #     "python3 '$TOOLS/anchor-inbatch-gate.py'"
+      #   add_item L3 "anchor-uncheck-zero-gate" \
+      #     "python3 -I '$TOOLS/anchor-uncheck-zero-gate.py'"
+      #   add_item L3 "方法论 anchor-check（锚点全解析）" \
+      #     "python3 '$WS/计划/研究组/方法论批-20261031/anchor-check.py'"
+      - name: 专项门 · anchor（锚批内回填纪律 / 未核=0 处置正本 / 方法论锚点全解析）
+        if: ${{ contains(inputs.special_gates, 'anchor') }}
+        run: |
+          set -eu
+          python3 tools/anchor-inbatch-gate.py
+          python3 -I tools/anchor-uncheck-zero-gate.py
+          python3 计划/研究组/方法论批-20261031/anchor-check.py
+
+      # otel 门族——命令正本 tools/all-gates.sh:919（ch-mes-reconcile --selftest
+      # CH 写入对账门）、:919-926（otlp-assert --selftest / --sidecar 断言层）、
+      # :931-937（--production-check 全订单名册覆盖·真库消费面）、:1097-1100
+      # （otel-reconcile-probe --selftest 夹具门 + --check 对账实查消费面）：
+      #   add_item L3 "ch-mes-reconcile.py --selftest" \
+      #     "python3 '$TOOLS/otel/ch-mes-reconcile.py' --selftest"
+      #   add_item L3 "otlp-assert.py --selftest" \
+      #     "python3 '$TOOLS/otel/otlp-assert.py' --selftest"
+      #   add_item L3 "otlp-assert.py --sidecar" \
+      #     "python3 '$TOOLS/otel/otlp-assert.py' --sidecar"
+      #   add_item L3 "otlp-assert.py --production-check（全订单名册覆盖·真库消费面）" \
+      #     "python3 '$TOOLS/otel/otlp-assert.py' --production-check"
+      #   add_item L3 "otel-reconcile-probe.py --selftest" \
+      #     "python3 '$TOOLS/otel/otel-reconcile-probe.py' --selftest"
+      #   add_item L3 "otel-reconcile-probe.py --check（OTel lane 对账实查消费面）" \
+      #     "python3 '$TOOLS/otel/otel-reconcile-probe.py' --check"
+      # 注：--production-check / --check 是只读状态面消费面（状态面由定时跑
+      # 落盘）——读数过期即红（死手断言），与本地 cron 面同构，零网络。
+      - name: 专项门 · otel（CH 对账自测 / 断言层三模式 / lane 对账实查）
+        if: ${{ contains(inputs.special_gates, 'otel') }}
+        run: |
+          set -eu
+          python3 tools/otel/ch-mes-reconcile.py --selftest
+          python3 tools/otel/otlp-assert.py --selftest
+          python3 tools/otel/otlp-assert.py --sidecar
+          python3 tools/otel/otlp-assert.py --production-check
+          python3 tools/otel/otel-reconcile-probe.py --selftest
+          python3 tools/otel/otel-reconcile-probe.py --check
