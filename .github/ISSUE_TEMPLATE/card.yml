@@ -1,0 +1,186 @@
+# =============================================================================
+# card.yml — 施工卡 issue 表单模板（org 治理面：.github 仓）
+#
+# 卡面自包含（30-工件/GitHub协作平面-建设方案/01-建设方案.md §三/§四；字段口径
+# 对齐 30-工件/波次自转器-20261106/制度-v1.md §一「波次清单每卡」与
+# wave-XX.json 实例）：一张卡 = 一个 issue，卡面不带够信息即不可派工。
+#   task_id / 债号 / 证据（内嵌）/ 验收命令集 / pinned base / 允许路径 /
+#   禁项（置顶）/ 内存预算 / 通道 —— 九项齐了才派得出去。
+#
+# label 纪律：新建卡自动落 wave/queued（状态机正本见 docs/labels.md）。
+# =============================================================================
+name: 施工卡（af 黑灯工厂）
+description: 波次自转开发制度 v1 的派工单——卡面自包含，九项字段齐备才进板
+labels:
+  - wave/queued
+body:
+  # ---- 禁项（置顶）----------------------------------------------------------
+  - type: markdown
+    attributes:
+      value: |
+        ## ⛔ 禁项（置顶：先读再填）
+
+        1. **判官/门/判据件一改即拒收**（rt-e82/83 双案，制度-v1 §六.4）：
+           判官路径 = 门禁脚本 + 判据件（清单见 `docs/judge-paths.md`）。触碰这些
+           路径的 PR 被仓级 CODEOWNERS 保护规则直接拒绝——G-JUDGE 从「事后闸红」
+           升级为「合不进去」，没有评审例外。
+        2. secret 绝不入 git（指纹+路径 only）；PAT 只经 askpass 现取不落盘。
+        3. cargo 测试环境剥离代理凭据（`env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy LC_CTYPE=C.UTF-8`）；本机（local-api/GLM 通道）**禁 cargo**。
+        4. 不 force push、不 reset --hard、不动历史记录；合线 `--no-ff`，feature 分支须显式 refspec 取回（origin fetch 面窄化教训，制度-v1 §六.1）。
+        5. 占用闸禁 `--force-occupancy`；台账无行的债号占用闸 fail-closed BLOCK——派卡前置 = 登记债行或换锚（制度-v1 §六.3）。
+
+  # ---- 1. task_id -----------------------------------------------------------
+  - type: input
+    id: task_id
+    attributes:
+      label: task_id
+      description: 任务唯一标识，小写连字符（如 otel-e2e-final-fix）。与分支名 task/<issue>-<slug> 对应。
+      placeholder: otel-e2e-final-fix
+    validations:
+      required: true
+
+  # ---- 2. 债号 --------------------------------------------------------------
+  - type: input
+    id: debt
+    attributes:
+      label: 债号（debt）
+      description: 本卡清偿的逃逸问题台账债号（如 RT-E230）。占用闸按债号判重；无债号 = 换锚或先登记债行（禁 --force）。
+      placeholder: RT-E230
+    validations:
+      required: true
+
+  # ---- 3. 证据（内嵌）--------------------------------------------------------
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据（内嵌）
+      description: |
+        判决依据直接嵌在卡面，不外链：逐条带 file:line 实读位置与关键输出片段。
+        证据不足 = 卡不成立（verdict 逐条带 file:line 证据，对齐 wave-01.json 验收口径）。
+      placeholder: |
+        - tools/otel-e2e-check.py:266/:275 两处 SELECT 缺 FINAL（实读确认）
+        - 复现输出：……
+      render: bash
+    validations:
+      required: true
+
+  # ---- 4. 验收命令集 ---------------------------------------------------------
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收命令集（acceptance）
+      description: |
+        一行一条，精确到命令与期望（退出码 + 期望串）。PR 模板里要逐条贴实跑结果。
+        命令名以 af/ci 与 tools/ 实读为正本，禁凭空编造（如 `python3 -B ci/strategies_check.py`）。
+      placeholder: |
+        python3 -B ci/strategies_check.py   # exit 0
+        python3 -c "import py_compile,sys; py_compile.compile('tools/otel-e2e-check.py', doraise=True)"   # exit 0
+      render: bash
+    validations:
+      required: true
+
+  # ---- 5. pinned base -------------------------------------------------------
+  - type: input
+    id: pinned_base
+    attributes:
+      label: pinned base（钉死基点）
+      description: 验收与合线的钉死基点：分支名（product/main）或 40 位 commit sha。基点变化 = 重验，不继承旧绿。
+      placeholder: product/main
+    validations:
+      required: true
+
+  # ---- 6. 允许路径 ----------------------------------------------------------
+  - type: textarea
+    id: allowed_paths
+    attributes:
+      label: 允许路径（allowed_paths）
+      description: 一行一个；只许改这些路径，越界即拒收。判官路径见禁项第 1 条（docs/judge-paths.md）。
+      placeholder: |
+        tools/otel-e2e-check.py
+      render: bash
+    validations:
+      required: true
+
+  # ---- 7. 内存预算 ----------------------------------------------------------
+  - type: dropdown
+    id: mem_budget_g
+    attributes:
+      label: 内存预算（mem_budget_g，GB）
+      description: |
+        OOM 准入制硬约束（制度-v1 §五）：anolis Σmem_budget ≤ 45G（125G 的 36%）、
+        cargo 并发 ≤ 4；本机 ≈ 2G（cargo 永禁）；gov 单卡 ≤ 2G。
+        anolis-build 通道通常 6-10G/卡。
+      options:
+        - "0"
+        - "1"
+        - "2"
+        - "4"
+        - "6"
+        - "8"
+        - "10"
+    validations:
+      required: true
+
+  # ---- 8. 通道 --------------------------------------------------------------
+  - type: dropdown
+    id: channel
+    attributes:
+      label: 通道（channel）
+      description: |
+        runner 按通道派发（制度-v1 §二四通道）：
+        anolis-build = cargo 构建轨（验收 = cargo test/clippy/strategies_check 全绿）；
+        local-api = 本机 API 轨（禁 cargo；点名 gate 脚本/字节对账）；
+        bot-lane = 外部沙箱异步（先登记后发布，占用闸如实拦）；
+        GLM-start-plan = 免费窗内换模型（同 local-api 口径）。
+      options:
+        - anolis-build
+        - local-api
+        - bot-lane
+        - GLM-start-plan
+    validations:
+      required: true
+
+  # ---- 9. 专项门点选（可选，gates.yml inputs） --------------------------------
+  - type: input
+    id: special_gates
+    attributes:
+      label: 专项门点选（special_gates，可空）
+      description: |
+        逗号分隔子集 {ledger, anchor, otel}，对应可复用 gates.yml 的
+        inputs.special_gates（判据件随 factory-os 的 tools/ 面走；af 产品仓留空）。
+        点选而门件不在位 = 显式红（摘门保牌形态，禁）。
+      placeholder: ledger,otel
+    validations:
+      required: false
+
+  # ---- 附加（可选，保持卡面自包含）--------------------------------------------
+  - type: dropdown
+    id: merge_policy
+    attributes:
+      label: 合线策略（merge_policy，可空）
+      description: content-only（只读卡无 patch）/ 单件直推 / --no-ff 合线后 FF push（制度-v1 §三合线路）。
+      options:
+        - 未指定
+        - content-only
+        - 单件直推
+        - no-ff-merge
+    validations:
+      required: false
+
+  - type: input
+    id: ledger
+    attributes:
+      label: ledger 坐标（可空）
+      description: 落账坐标：台账行/批注/变更日志行，合线后回写只翻状态格 + 行尾 append 依据句（wc -l 不变）。
+      placeholder: 变更日志行
+    validations:
+      required: false
+
+  - type: textarea
+    id: depends_on
+    attributes:
+      label: 前置依赖（depends_on，可空）
+      description: 一行一条；同锚并发防重（如「RT-E138 占用已释放」）。
+      render: bash
+    validations:
+      required: false
