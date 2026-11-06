@@ -1,24 +1,40 @@
 {
   "schema": "af.model-quota-hold.v2",
-  "source": "状态/模型配额停用-20261105.json（2026-11-06 09:25 版）实读提炼",
-  "updated_at": "2026-11-06T17:36:12+0800",
+  "source": "状态/模型配额停用-20261105.json（workflow_model_policy 段 · 运营者 2026-11-06 裁定）实读提炼",
+  "updated_at": "2026-11-06T18:11:35+0800",
   "hold_until": "2026-11-06T18:00:00+0800",
   "calls_this_hour": 0,
+  "workflow_model_policy": {
+    "ruling": "运营者 2026-11-06：全面放开 individual plan GLM-5.3-Flash，未来工作流子代理一律用 GLM-5.3-Flash",
+    "rank1": "account:bigmodel-individual-coding-plan/GLM-5.3-Flash",
+    "fallback": "new-provider/step-5-preview",
+    "applies_to": [
+      "工作流子代理",
+      "规划环(planner) LLM 调用",
+      "红队 review 咨询腿"
+    ]
+  },
   "priority": [
     {
       "rank": 1,
-      "provider_id": "new-provider",
-      "model_id": "step-5-preview",
-      "note": "唯一主通道（minimax 周额度清零后）；key 2026-12-05 20:00 过期前持续用。"
+      "provider_id": "account:bigmodel-individual-coding-plan",
+      "model_id": "GLM-5.3-Flash",
+      "note": "唯一主通道（运营者裁定，见 workflow_model_policy 段）；bigmodel individual coding plan，OpenAI 兼容端点 open.bigmodel.cn/api/coding/paas/v4；周限滚动重置，无 key 到期日记录"
     },
     {
       "rank": 2,
+      "provider_id": "new-provider",
+      "model_id": "step-5-preview",
+      "note": "fallback 通道；key 2026-12-05 20:00 过期前可用（切回需同步改 planner.yml LLM_BASE_URL/LLM_MODEL 与 secret）"
+    },
+    {
+      "rank": 3,
       "provider_id": "x-ai",
       "model_id": "grok-4.6",
       "note": "anolis 兜底。"
     },
     {
-      "rank": 3,
+      "rank": 4,
       "provider_id": "(运营者支援)",
       "model_id": "(别的 plan 额度)",
       "note": "动用前必须明确说。"
@@ -26,20 +42,18 @@
   ],
   "banned": {
     "providers": [
-      "account:bigmodel-individual-coding-plan",
       "account:bigmodel-offpeak-idle-plan",
       "account:bigmodel-highspeed-card",
       "account:minimax-token-plan"
     ],
     "model_ids": [
       "GLM-5.3",
-      "GLM-5.3-Flash",
       "MiniMax-M3.1-Flash"
     ],
-    "note": "GLM 全账户停用至 2026-11-06 18:00；start-plan 免费窗 2026-11-06 09:00 EXPIRED；minimax 周额度 EXHAUSTED（禁用至周额度重置，重置时点待运营者告）。"
+    "note": "GLM-5.3 与其余 GLM 账户（start-plan/offpeak/highspeed）持至 2026-11-06 18:00；minimax 周额度 EXHAUSTED（禁用至周额度重置）；individual-coding-plan/GLM-5.3-Flash 已按运营者 2026-11-06 裁定解禁"
   },
   "refresh": {
     "status": "pending-card",
-    "note": "本件为治理副本：本地 cron 定时从 状态/模型配额停用-*.json 刷新为后续卡——P4 落地本次只落初值。"
+    "note": "本件为治理副本：本地 cron 定时从 状态/模型配额停用-*.json 刷新为后续卡——本次只落初值。"
   }
 }
