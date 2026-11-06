@@ -1588,14 +1588,25 @@ jobs:
               dup = set()
               lines = text.splitlines()
               i, n = 0, len(lines)
-              block_until = None             # 块标量吞行态（父键缩进）
+              # 块标量态：真内容入值（R17/R21/S3 等命令位扫描面依赖实文，禁占位符）
+              block_target = None            # (parent_dict, key)
+              block_buf = []
+              block_indent = None
               while i < n:
                   raw = lines[i]
                   i += 1
-                  if block_until is not None:
-                      if raw.strip() == "" or len(raw) - len(raw.lstrip(" ")) > block_until:
+                  if block_target is not None:
+                      ind = len(raw) - len(raw.lstrip(" "))
+                      if raw.strip() == "" or ind > block_indent:
+                          block_buf.append(raw[ind:] if raw.strip() else "")
                           continue
-                      block_until = None
+                      p_, k_ = block_target
+                      p_[k_] = "\n".join(block_buf)
+                      block_target = None
+                      # 落出块标量：当前行按常规解析（不吞）
+                  if "\t" in raw:
+                      # YAML 禁 TAB（缩进/分隔）；块标量内容已在上方吞行面消费——到这仍见 TAB=结构面 TAB，fail-closed
+                      raise ValueError(f"TAB（L{i}）——缩进/分隔面禁 TAB（fail-closed）")
                   stripped = raw.strip()
                   if stripped == "" or stripped.startswith("#"):
                       continue
@@ -1624,8 +1635,9 @@ jobs:
                       item = {}
                       parent.append(item)
                       if val0 in ("|", "|-", ">", ">-", "|+", "+"):
-                          item[key0] = "<<<BLOCK>>>"
-                          block_until = indent
+                          block_target = (item, key0)
+                          block_buf = []
+                          block_indent = indent
                       elif val0 == "":
                           if deeper:
                               stack.append((indent, item))
@@ -1651,8 +1663,9 @@ jobs:
                       raise ValueError(f"重复键: {key}")
                   dup.add(sig)
                   if val in ("|", "|-", ">", ">-", "|+", "+"):
-                      parent[key] = "<<<BLOCK>>>"
-                      block_until = indent
+                      block_target = (parent, key)
+                      block_buf = []
+                      block_indent = indent
                       continue
                   if val == "":
                       child = None
@@ -1678,6 +1691,9 @@ jobs:
                           parent[key] = None
                       continue
                   parent[key] = _scalar(val)
+              if block_target is not None:
+                  p_, k_ = block_target
+                  p_[k_] = "\n".join(block_buf)
               return root
 
 
