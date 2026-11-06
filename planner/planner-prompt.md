@@ -83,7 +83,11 @@
 - `async`：布尔。
 - `channel`：∈ `channels_allowed`（当前 = `anolis-build` / `local-api` / `bot-lane`）。
 - `allowed_paths`：非空字符串数组（文件或目录，仓内相对路径）。
-- `acceptance`：非空字符串数组，每条 = 可执行命令 + 退出码/期望串（确定性验收，禁「原则上」类措辞）。
+- `acceptance`：非空字符串数组，每条 = 可执行命令 + **期望退出码尾标**（确定性验收，禁「原则上」类措辞）。硬形制（step 08 机检 M-1，违一条即整份 manifest 作废）：每条必须含「→ rc=N」（N=阿拉伯数字）期望退出码，命令部分必须真的可执行。
+  - ✅ `"python3 -m py_compile tools/otel-e2e-check.py → rc=0"`
+  - ✅ `"jq -e '.outcome==\"pass\"' dryrun-report.json → rc=0"`
+  - ❌ `"python3 -m py_compile tools/otel-e2e-check.py"`（缺「→ rc=N」尾标——M-1 作废）
+  - ❌ `"全量 all-gates 该门项绿"`（非可执行命令且缺尾标——M-1 作废；门禁面读数请落 ledger/notes 面）
 - `merge_policy`：非空（如 `content-only` / `单件直推（…）` / `merge-check 范式（显式 refspec 取回）` / `no-merge（文档批）` / `n/a（库操作）`）。
 - `ledger`：非空账面坐标——字符串（如 `台账 RT-E117 行`）或 `{"rows":[{"file":…,"row_key":…,"evidence":…}]}`；坐标必须来自输入，禁编造。
 - `mem_budget_g`：非负整数。
@@ -198,7 +202,7 @@
       "async": false,
       "channel": "anolis-build",
       "allowed_paths": ["tools/otel-e2e-check.py"],
-      "acceptance": ["python3 -m py_compile tools/otel-e2e-check.py → rc=0", "全量 all-gates 该门项绿"],
+      "acceptance": ["python3 -m py_compile tools/otel-e2e-check.py → rc=0", "jq -e '.gates.otel_e2e == \"绿\"' run-summary.json → rc=0"],
       "merge_policy": "单件直推（tools/ 非 af 仓：改前 .bak+钉桩重锚）",
       "ledger": "变更日志行",
       "mem_budget_g": 1,
