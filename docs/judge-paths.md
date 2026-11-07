@@ -80,6 +80,8 @@
 | `tools/mirror-scan-allowlist.json` | PR 门剖面② bot-scrub 树扫豁免面（判据件：pattern/file/reason/expires 四键缺一不认；**行钉**——条目带 line 必与命中行同号，行漂移不豁免；expires 2026-12-05 到期不复审整体失效回红=有意设计的时间炸弹，factory-os#2/D-72） | factory-os/.github/workflows/gates.yml:286-310、头注:33-44（raw 实读 2026-11-06） |
 | `tools/test-ledger-migration-recon.py` | PR 门剖面③ 账本迁移对账门判别力自证（`--selftest` 内嵌夹具 25 例含 tamper 反例；无参实跑判据面在仓外 ⇒ PR 面只验判别力） | factory-os/.github/workflows/gates.yml:401-411（raw 实读 2026-11-06） |
 | `.github/workflows/gates.yml` | PR 门接线件（五步剖面：分工声明／检出 PR 头树／①py_compile 全量 tools/＋件数下限对账／②bot-scrub 树扫 fail-closed，扫描内核=mirror-disclose.sh 内嵌 scan_text() 经 AST 切取复用／③对账判别力自证）；作业名恒 `gates`=分支保护 required check 上下文。注：factory-os 仓级 CODEOWNERS 实况未单列此行（af 实况有列 `/​.github/workflows/gates.yml`）——派生缺口如实记录，留 factory-os 侧批修 | factory-os/.github/workflows/gates.yml:87-112（raw 实读 2026-11-06） |
+| `tools/swev-judge-v2.py` 及同族三件（`swev-judge-v2-zero-scan.py`／`swev-judge-v2-replay.py`／`swev-judge-v2-selftest.py`） | swev 判分链判官件族：v2 判分器本体（D-32 三缺陷修复版，判分门）+ 零状态普查/交付回放/正反例自测三伴件（改任一件=改判分判据面） | tools/swev-judge-v2.py 头注（D-32/红队裁决 R4/R5/R7）；三伴件头注同源 |
+| `tools/card-selfcontainment-check.py`、`tools/dispatch-occupancy-check.py` | 派前三闸两件机检本体：审卡闸（六要件自包含，RULE_TABLE sha256 与 planner step 08 互钉）／占用闸（防双解占用；登记前 BLOCK fail-closed） | tools/card-selfcontainment-check.py 头注（Q1 §3.1；D-97=factory-os#30）；tools/dispatch-occupancy-check.py 头注 |
 | `计划/研究组/方法论批-20261031/anchor-check.py` 及方法论正本 | 方法论锚点常驻门（锚点漂移即时红；改锚即改正本） | tools/all-gates.sh:940 |
 | `账本/`、`波次清单/*.md`、制度文档 | append-only 证明面/制度面（回写范式：只翻状态格+行尾 append）。波次清单锁面=**`*.md` 口径**（制度-v1.md 等制度/草稿文档），与 factory-os 仓级 CODEOWNERS 实况逐字对齐 | 制度-v1 §三落账路；factory-os CODEOWNERS:33/:47（2026-11-06 实读） |
 
@@ -89,6 +91,16 @@
 > PR 触碰即需 code owner 批准 ⇒ 0 批准自动合线不成立、规划环首波卡死。判据件定义不变
 > （tools/ 门本体、账本三件套、制度文档）；后续若 manifest 被赋予判据属性，回锁须同批
 > 重钉并登记依据。出处：factory-os 仓级 `CODEOWNERS:39-47`（实读）。
+>
+> **裁 9 补条（2026-11-07，运营者准；是补名不是扩权）**：M-4 判官面判定从「双源
+> （CODEOWNERS 实读派生 ∪ 本登记表静态族）」改**单源=本登记表点名单**（双源时代
+> CODEOWNERS 源把 `/tools/` 整树判官面化，误拦首张真卡 `tools/disk-waterline-carrier.py`
+> 等非登记表路径；今日 57+ 张 tools/ PR 经标准流合线实证）。按「判据只许变严以
+> 登记表点名单+补条方式满足」纪律，同批补名四类公认判官件：swev 判分链判官件族
+> （v2 本体+零状态普查/回放/自测三伴件）与派前三闸两件机检本体（审卡闸/占用闸）
+> ——此前仅靠 CODEOWNERS 派生进场，单源后不点名即丢判官面识别。factory-os 侧
+> `JUDGE_STATIC_FACTORYOS` 常量同批补名（门本体两件），planner step 08 M-4 与
+> 审卡闸双镜同步；`tools/swev-judge-v2*.py` 由关键词族 `judge` 命中（无需补名即红）。
 >
 > 出处注（仓外工作区面，非判官路径）：`计划/…/anchor-check.py` 与对账门无参判据面
 > （逃逸问题台账.md 等）为仓外工作区件——factory-os 仓内无该路径，仓级 CODEOWNERS
