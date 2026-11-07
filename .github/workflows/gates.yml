@@ -61,6 +61,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ══════════════════════════════════════════════════════════════════════════
+  # ★ A1 fork 守卫（红队 H1 收紧 · 2026-11-07 · 运营者批 A1）：
+  #   本件 5 个作业全部跑自托管 runner（anolis-heavy）——自托管 runner 对未批
+  #   fork PR 也执行 PR 树代码（红队 H1）。每个作业加同一守卫：
+  #     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+  #   · 非 pull_request 事件（本件 workflow_call：事件面随调用方）⇒ 原样放行；
+  #   · pull_request 事件 ⇒ 仅同仓分支头放行，fork 头整 job 跳过（skipped
+  #     不判红、不拦合流）。
+  #   双保险：仓级设置 fork-pr-contributor-approval=all_external_contributors
+  #   （设置腿）先拦于 workflow 触发前，本守卫腿兜底于 job 调度层；调用方
+  #   （factory-os ci-gates-org.yml 委托作业）同式加守，两层一致。
+  #   链式传播：fmt 被守跳过 ⇒ needs 链上 clippy/test 等按默认 success() 语义
+  #   连带跳过（if 未含状态函数 ⇒ 默认 success() 检查照旧，链语义零变化）。
+  # ══════════════════════════════════════════════════════════════════════════
   # ---- 作业 1：fmt ----------------------------------------------------------
   # 命令正本：af/ci/run.sh:219-220
   #   step 1 "cargo fmt --check + K5 判分链路径 lint" --
@@ -70,6 +84,7 @@ jobs:
   fmt:
     runs-on: [anolis-heavy]
     timeout-minutes: 45
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false   # A1 fork 守卫（H1）
     steps:
       - name: 分工声明（F2 全量门上 runner；本地 ZCode 不再验收耦合）
         run: |
@@ -122,6 +137,7 @@ jobs:
     needs: fmt
     runs-on: [anolis-heavy]
     timeout-minutes: 45
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false   # A1 fork 守卫（H1）
     steps:
       - name: clippy + 警告基线门（硬门：只拦新增警告）
         run: |
@@ -144,6 +160,7 @@ jobs:
     needs: clippy
     runs-on: [anolis-heavy]
     timeout-minutes: 45
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false   # A1 fork 守卫（H1）
     steps:
       - name: strategies/ 策略库全量校验（硬门）
         run: |
@@ -162,6 +179,7 @@ jobs:
     needs: strategies_check
     runs-on: [anolis-heavy]
     timeout-minutes: 45
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false   # A1 fork 守卫（H1）
     steps:
       - name: provenance 门 + cargo test -j4 --workspace（硬门）
         run: |
@@ -192,6 +210,7 @@ jobs:
     needs: test
     runs-on: [anolis-heavy]
     timeout-minutes: 45
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false   # A1 fork 守卫（H1）
     env:
       SPECIAL_GATES: ${{ inputs.special_gates }}
     steps:
