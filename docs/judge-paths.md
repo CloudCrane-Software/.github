@@ -145,3 +145,59 @@
 **有意变更判官路径的唯一正路**：运营者裁决 → 同批改判据/基线 + 机生成重钉
 （`bash ci/gate_inputs_check.sh update` / `bash tools/gate-pins-refresh.sh`）+
 登记依据（同批评审提交）→ 过 @feasy898 审批合入。工人通道禁行此路。
+
+---
+
+## 五、判官件部署面对账注册表（swev-judge-v2.py 全部已知部署拷贝；机读段）
+
+> **本节是「哪些拷贝存在、各自期望什么字节」的唯一机器可读源**，由 factory-os 仓
+> `tools/judge-deploy-recon-gate.py`（Q10 修·2026-11-07 红队门首考批新建门）消费：
+> active 行实测 sha256 对账（不符 ⇒ 红）、扫描根（anolis 巡检=/data/bench）内注册表外
+> 拷贝开红（完备性）、判分缓存记录面（tasks/*.verify.json 的 judge_sha256＋
+> eval_script_sha256）双 sha 硬校验。**首考读数（证伪不了·按不过）**：anolis
+> swev-judge-cache 判官件实测 3f958c92（旧版 D-32）而仓内现役 4a7156dd（D-32＋A6
+> 参数化 ID 归一化）——真实漂移在场且无门能红；缓存记录面只有「记录」没有「判分前
+> 硬校验」。本表＋该门即判分链缓存污染防线（判官件本体零改动，铁律不破）。
+>
+> 状态语义（两值，禁第三态）：
+> · **active**＝判分链此刻可载入的部署面。实测 sha256 必须 ≡ 期望值；位于扫描根内
+>   而缺席 ⇒ 红（部署面被删）。期望 sha 与仓内 `tools/swev-judge-v2.py` 同批重钉。
+> · **historical-frozen**＝已收卷 bench 的历史 run 工件。字节冻结：实测 ≠ 登记 sha
+>   ⇒ 红（历史工件被改）；**不得用于新判分**（引用面已核：2026-11-07 全 anolis
+>   grep，无活跃脚本/cron 引用，仅账本历史行提及路径）。
+>
+> 路径为绝对路径（各机部署面）或仓内相对路径（相对 factory-os 仓根，门 `--fos-root`
+> 解析）。跨机登记行不在本机 ⇒ 门记 INFO 不判（存在则仍验 sha）——一张注册表同时
+> 服务本机与 anolis 两个巡检面。
+>
+> **正式升版 runbook（判官件版本推进时同批执行，禁跳步）**：① 仓内判官件换版＋本表
+> active 期望 sha 同批重钉（走 §四「有意变更判官路径的唯一正路」）；② 各 active 部署面
+> 对齐（cp 仓内权威件，门 L1 转绿）；③ 缓存记录面刷新——逐 task 重跑取数件重写
+> verify.json（`<py> <cache>/swev-spec-fetch.py --quiet --out <cache>/tasks/<iid>.verify.json
+> <cache>/tasks/<iid>.json`）：旧版 sha 退场后未刷新的记录会被门判红（记录面引用未登记
+> 版本），此步是升版闭环件；④ 门全绿留读数。
+>
+> 本表**只增不减**：新增部署面/历史归档逐路径登记后门才放行；删行＝缩小对账面的，视同
+> 改判据（走 owner 裁决正路）。机读段围栏内的表格行形态＝
+> `| 行号 | 部署路径 | 状态 | 期望 sha256 | 语义/依据 |`，行号须匹配 `^[JH]\d+$`。
+
+<!-- judge-deploy-registry:begin -->
+
+| 行 | 部署路径 | 状态 | 期望 sha256 | 语义/依据 |
+|---|---|---|---|---|
+| J1 | tools/swev-judge-v2.py | active | 4a7156dd5e45197f7d8ab39be236eb9bb7a0ce7af220bca2395f863d71133389 | factory-os 仓内现役权威件（D-32 三缺陷修复＋A6 参数化 ID 归一化版）；anolis 各部署面的对齐源；仓内相对路径，门按 --fos-root 解析 |
+| J2 | /data/bench/swev-judge-cache/swev-judge-v2.py | active | 4a7156dd5e45197f7d8ab39be236eb9bb7a0ce7af220bca2395f863d71133389 | anolis 判分缓存面（swev-spec-fetch.py 同目录载入位；warm-relay 远端复用验证的判官件）。Q10 修前实测 3f958c92…漂移，2026-11-07 已对齐并留前后对照 |
+| J3 | /data/gh-runner-fos-work/factory-os/factory-os/tools/swev-judge-v2.py | active | 4a7156dd5e45197f7d8ab39be236eb9bb7a0ce7af220bca2395f863d71133389 | anolis 自托管 runner（anolis-fos-01）工作树检出位。job 检出会重写该树：正式升版 PR 窗口内可能瞬时新旧交替＝有意过程非静默漂移；登记但不纳入 L2 扫描根（转义检出免误红） |
+| J4 | /data/bench/D-117/swev-judge-v2.py | active | 4a7156dd5e45197f7d8ab39be236eb9bb7a0ce7af220bca2395f863d71133389 | D-117 在役 bench 判分腿（dump_eval_sh.py:JUDGE_PATH；与缓存面同链消费） |
+| J5 | /home/pan-ding/workspace/agent黑灯工厂/tools/swev-judge-v2.py | active | 4a7156dd5e45197f7d8ab39be236eb9bb7a0ce7af220bca2395f863d71133389 | 本机工作区 live 拷贝（cb-run 等本机 harness 的判官件载入位；仓外镜像，随仓内权威件同步） |
+| H1 | /data/bench/D-86/swev-judge-v2.py | historical-frozen | 3f958c929eb580a1a0820be58a6c8aeb21dd68481fa3d4b10341bb0977f9ee6a | D-86 已收卷 bench 历史工件（django__django-11133 首跑·2026-11-06 收卷）——字节冻结，不得用于新判分 |
+| H2 | /data/bench/D-106/swev-judge-v2.py | historical-frozen | 3f958c929eb580a1a0820be58a6c8aeb21dd68481fa3d4b10341bb0977f9ee6a | D-106 已收卷 bench 历史工件——字节冻结，不得用于新判分 |
+| H3 | /data/bench/D-107/swev-judge-v2.py | historical-frozen | 3f958c929eb580a1a0820be58a6c8aeb21dd68481fa3d4b10341bb0977f9ee6a | D-107 已收卷 bench 历史工件（django__django-11149）——字节冻结，不得用于新判分 |
+| H4 | /home/pan-ding/workspace/agent黑灯工厂/30-工件/D-86-bench试跑-20261106/swev-judge-v2.py | historical-frozen | 3f958c929eb580a1a0820be58a6c8aeb21dd68481fa3d4b10341bb0977f9ee6a | 本机 D-86 判分腿输入留档（30-工件 目录·仓外工作区件；仅存档） |
+
+<!-- judge-deploy-registry:end -->
+
+> 注（仓外工作区面，非判官路径）：anolis /tmp/d117-in/swev-judge-v2.py（05:28 暂存 scratch，
+> 旧版 3f958c92…）为 D-117 判分腿输入暂存残件，无活跃进程引用、不在 L2 扫描根
+> （/data/bench）内，故不入本表；按只增不减纪律留待自然清理，清理前不得回流入任何
+> 部署面（门 L1/L2 会红）。
