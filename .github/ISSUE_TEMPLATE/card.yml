@@ -33,6 +33,7 @@ body:
         3. cargo 测试环境剥离代理凭据（`env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy LC_CTYPE=C.UTF-8`）；本机（local-api/GLM 通道）**禁 cargo**。
         4. 不 force push、不 reset --hard、不动历史记录；合线 `--no-ff`，feature 分支须显式 refspec 取回（origin fetch 面窄化教训，制度-v1 §六.1）。
         5. 占用闸禁 `--force-occupancy`；台账无行的债号占用闸 fail-closed BLOCK——派卡前置 = 登记债行或换锚（制度-v1 §六.3）。
+        6. **零技术债（铁律 4，运营者 2026-11-07 裁定）**：不为当下需求做 workaround——解法循通用惯例/标准实践，且未来 agent 只凭仓内材料可懂。判定问句：「一个从未见过本项目的新 agent，六个月后读到这段，能不能不看会话记录就懂？」不能=债：先按债号顺号登记台账再开工（正本：docs/engineering-principles.md）。
 
   # ---- 1. task_id -----------------------------------------------------------
   - type: input
