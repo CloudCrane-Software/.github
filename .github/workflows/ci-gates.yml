@@ -775,7 +775,7 @@ jobs:
   # ---- 批2 · A-5：门输入全集钉对账（清单即造册＋全集自动守卫；失配/漏钉/缺件一律红） ----
   pin-check:
     name: "批2·A-5 门输入全集钉对账（清单即造册＋全集自动守卫＋双消费面三方对账）"
-    if: ${{ inputs.pin_check_enable == 'true' }}
+    if: ${{ inputs.pin_check_enable == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}   # A1 fork 守卫（H1）：fork PR 头不上自托管 runner
     runs-on: ${{ inputs.g2_runs_on }}
     timeout-minutes: 45
     env:
@@ -1192,7 +1192,7 @@ jobs:
   # ---- 批2 · A-15：长杆预算自适应＋单例锁＋日志 per-run 隔离（机制移植，校准常量留调用仓） ----
   budget-adaptive:
     name: "批2·A-15 预算自适应（scale 派生＋基线不松帽）＋单例锁（DEB-10）＋per-run 隔离（RT-E73）"
-    if: ${{ inputs.budget_enable == 'true' }}
+    if: ${{ inputs.budget_enable == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}   # A1 fork 守卫（H1）：fork PR 头不上自托管 runner
     runs-on: ${{ inputs.g2_runs_on }}
     timeout-minutes: 45
     env:
@@ -1546,7 +1546,7 @@ jobs:
   # ---- 批2 · A-22：PR 反馈面防弱化静态自检（F1 面作用域；R08–R16 L-18 未裁不外推） ----
   workflow-hygiene:
     name: "批2·A-22 PR 反馈面防弱化（结构规则子集 R01–R07/R12/R13/R15/R17/R19/R20/R21；F1 面作用域）"
-    if: ${{ inputs.hygiene_enable == 'true' }}
+    if: ${{ inputs.hygiene_enable == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}   # A1 fork 守卫（H1）：fork PR 头不上自托管 runner
     runs-on: ${{ inputs.g2_runs_on }}
     timeout-minutes: 45
     env:
@@ -2168,7 +2168,7 @@ jobs:
   # ---- 批2 · A-17：安全编码硬规则 lint（只报不加；点选制） ----
   secure-lint:
     name: "批2·A-17 安全硬规则 lint（S1 密钥出域 0600／S2 realpath 前缀／S3 命名空间 fail-closed／S4 禁 stdout-only）"
-    if: ${{ inputs.secure_lint_enable == 'true' }}
+    if: ${{ inputs.secure_lint_enable == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}   # A1 fork 守卫（H1）：fork PR 头不上自托管 runner
     runs-on: ${{ inputs.g2_runs_on }}
     timeout-minutes: 45
     env:
@@ -2636,7 +2636,7 @@ jobs:
   # 共用同一点选（RT-E121：A-6 与 A-2 必须同批——同批卫以共用点选机判化）。
   roster-check:
     name: "批3·A-2 名册四面对账（名册在库＋自声明段核＋件数下限对账＋变更留痕 diff 面）"
-    if: ${{ inputs.roster_enable == 'true' }}
+    if: ${{ inputs.roster_enable == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}   # A1 fork 守卫（H1）：fork PR 头不上自托管 runner
     runs-on: ${{ inputs.g2_runs_on }}
     timeout-minutes: 45
     env:
@@ -3156,7 +3156,7 @@ jobs:
   # 点选: 与 A-2 共用 roster_enable（同批卫——单上 A-6 中假绿，RT-E121）。
   mutation-drill:
     name: "批3·A-6 变异演练（删名册列名件⇒必红／复原⇒必绿；与 A-2 同批）"
-    if: ${{ inputs.roster_enable == 'true' }}
+    if: ${{ inputs.roster_enable == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}   # A1 fork 守卫（H1）：fork PR 头不上自托管 runner
     runs-on: ${{ inputs.g2_runs_on }}
     timeout-minutes: 45
     env:
