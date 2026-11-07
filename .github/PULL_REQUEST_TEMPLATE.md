@@ -97,3 +97,4 @@ Co-Authored-By: <!-- 姓名 <邮箱> -->
 - [ ] 无 secret 入 git（指纹+路径 only）
 - [ ] 未 force push / 未 reset --hard / 未动历史记录
 - [ ] 落账坐标（ledger）已填，待合线后按「只翻状态格 + 行尾 append 依据句」回写
+- [ ] 无 workaround：解法循惯例、未来 agent 只凭仓内材料可懂（铁律 4）
